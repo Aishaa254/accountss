@@ -1,0 +1,85 @@
+.sidebar {
+    width: 250px;
+    height: 100vh;
+    background: var(--card);
+    border-right: 1px solid var(--border);
+    position: fixed;
+    top: 0;
+    left: 0;
+    padding: 20px 15px;
+    overflow-y: auto;
+}
+
+.logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 25px;
+    padding: 0 10px;
+}
+
+.logo h2 {
+    font-size: 20px;
+    color: var(--main);
+}
+
+.logo-icon {
+    background: linear-gradient(135deg, var(--main), var(--main-light));
+    color: white;
+    width: 36px;
+    height: 36px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: bold;
+}
+
+.logo-light-mode,
+.logo-dark-mode {
+    height: 36px;
+}
+
+.logo-dark-mode {
+    display: none;
+}
+
+[data-mode="dark"] .logo-light-mode {
+    display: none;
+}
+
+[data-mode="dark"] .logo-dark-mode {
+    display: block;
+}
+
+.menu-title {
+    font-size: 12px;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin: 20px 10px 8px;
+}
+
+.menu-link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    color: var(--muted);
+    text-decoration: none;
+    border-radius: 10px;
+    font-size: 15px;
+    margin-bottom: 3px;
+    transition: 0.2s;
+}
+
+.menu-link:hover {
+    background: var(--hover);
+    color: var(--main);
+}
+
+.menu-link.active {
+    background: var(--main-soft);
+    color: var(--main);
+    font-weight: 600;
+}

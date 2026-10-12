@@ -1,0 +1,122 @@
+var themes = {
+    emerald: ['#0f766e', '#10b981'],
+    ocean:   ['#1d4ed8', '#3b82f6'],
+    purple:  ['#6d28d9', '#8b5cf6'],
+    sunset:  ['#c2410c', '#f97316'],
+    rose:    ['#be123c', '#f43f5e'],
+    sky:     ['#0e7490', '#06b6d4']
+};
+
+var darkThemes = {
+    emerald: ['#14b8a6', '#34d399'],
+    ocean:   ['#60a5fa', '#93c5fd'],
+    purple:  ['#a78bfa', '#c4b5fd'],
+    sunset:  ['#fb923c', '#fdba74'],
+    rose:    ['#fb7185', '#fda4af'],
+    sky:     ['#22d3ee', '#67e8f9']
+};
+
+var fonts = {
+    segoe:     '"Segoe UI", Arial, sans-serif',
+    poppins:   '"Poppins", sans-serif',
+    roboto:    '"Roboto", sans-serif',
+    notoserif: '"Noto Serif", serif'
+};
+
+var currentThemeName = 'emerald';
+
+// ---------- Custom color helpers ----------
+function lighten(hex, amt) {
+    var n = parseInt(hex.slice(1), 16);
+    var r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255;
+    r = Math.round(r + (255 - r) * amt);
+    g = Math.round(g + (255 - g) * amt);
+    b = Math.round(b + (255 - b) * amt);
+    return '#' + ((1 << 24) + (r << 16) + (g << 8) + b).toString(16).slice(1);
+}
+
+function setCustomTheme(color) {
+    var light = lighten(color, 0.35);
+    themes.custom = [color, light];
+    darkThemes.custom = [color, light];
+}
+
+// ---------- Apply functions ----------
+function applyTheme(name) {
+    if (!themes[name]) name = 'emerald';
+    currentThemeName = name;
+
+    var isDark = document.documentElement.getAttribute('data-mode') === 'dark';
+    var colors = isDark ? darkThemes[name] : themes[name];
+
+    document.documentElement.style.setProperty('--main', colors[0]);
+    document.documentElement.style.setProperty('--main-light', colors[1]);
+}
+
+function applyMode(mode) {
+    if (mode === 'dark') {
+        document.documentElement.setAttribute('data-mode', 'dark');
+    } else {
+        document.documentElement.removeAttribute('data-mode');
+    }
+    applyTheme(currentThemeName);
+}
+
+function applyFont(name) {
+    if (!fonts[name]) name = 'segoe';
+    document.documentElement.style.setProperty('--font', fonts[name]);
+}
+
+// ---------- Page khulte hi saved cheezein lagao ----------
+var savedCustom = localStorage.getItem('customColor');
+if (savedCustom) setCustomTheme(savedCustom);
+
+applyMode(localStorage.getItem('mode') || 'light');
+applyTheme(localStorage.getItem('theme') || 'emerald');
+applyFont(localStorage.getItem('font') || 'segoe');
+
+// ---------- Settings page: Custom color Save button ----------
+document.addEventListener('DOMContentLoaded', function () {
+    var input = document.getElementById('customColor');
+    var saveBtn = document.getElementById('saveColor');
+    var msg = document.getElementById('colorMsg');
+    if (!input || !saveBtn) return;
+
+    if (savedCustom) input.value = savedCustom;
+
+    saveBtn.addEventListener('click', function () {
+        var value = input.value.trim();
+        if (value.charAt(0) !== '#') value = '#' + value;
+
+        if (!/^#[0-9a-fA-F]{6}$/.test(value)) {
+            if (msg) { msg.textContent = 'Write code correctly #ff5500'; msg.className = 'color-msg error'; }
+            return;
+        }
+
+        setCustomTheme(value);
+        localStorage.setItem('customColor', value);
+        localStorage.setItem('theme', 'custom');
+        applyTheme('custom');
+        input.value = value;
+        if (msg) { msg.textContent = 'Color is applied'; msg.className = 'color-msg ok'; }
+    });
+});
+// Sidebar logo: logo ho to "A" icon ki jagah dikhao
+function applySidebarLogo() {
+    var data = localStorage.getItem('brandLogo');
+    var img = document.getElementById('sidebarLogo');
+    var icon = document.getElementById('sidebarIcon');
+    if (!img || !icon) { return; }
+
+    if (data) {
+        img.src = data;
+        img.style.display = 'block';
+        icon.style.display = 'none';
+    } else {
+        img.removeAttribute('src');
+        img.style.display = 'none';
+        icon.style.display = '';
+    }
+}
+
+document.addEventListener('DOMContentLoaded', applySidebarLogo);

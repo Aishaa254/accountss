@@ -1,0 +1,71 @@
+:root {
+    --main: #0f766e;
+    --main-light: #10b981;
+    --main-soft: color-mix(in srgb, var(--main) 12%, var(--card));
+    --bg: #f5f7fb;
+    --card: #ffffff;
+    --border: #e5e7eb;
+    --text: #1e293b;
+    --muted: #64748b;
+    --hover: #f1f5f9;
+}
+
+[data-mode="dark"] {
+    --main: #14b8a6;          /* halka teal, dark par saaf dikhega */
+    --main-light: #34d399;
+    --bg: #0f172a;
+    --card: #1e293b;
+    --border: #334155;
+    --text: #e2e8f0;
+    --muted: #94a3b8;
+    --hover: #334155;
+    --main-soft: color-mix(in srgb, var(--main) 22%, var(--card));
+    
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: var(--font, "Segoe UI", Arial, sans-serif);
+    background: var(--bg);
+    color: var(--text);
+}
+button, input, select, textarea {
+    font-family: inherit;
+}
+
+.font-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+}
+
+.font-btn {
+    padding: 14px 22px;
+    border: 1px solid var(--border);
+    background: var(--card);
+    color: var(--text);
+    border-radius: 10px;
+    cursor: pointer;
+    font-size: 16px;
+}
+
+.font-btn.active {
+    border-color: var(--main);
+    background: var(--main-soft);
+    color: var(--main);
+    font-weight: 600;
+}
+
+.main {
+    margin-left: 250px;
+}
+
+.content {
+    padding: 25px;
+}

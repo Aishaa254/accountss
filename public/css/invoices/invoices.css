@@ -1,0 +1,48 @@
+.inv .cust-cards { grid-template-columns: repeat(2, 1fr); }
+.inv .modal-box.wide { width: 1120px; }
+.inv .modal-box.mid { width: 780px; }
+.inv .modal-box.small { width: 400px; }
+#pay-modal { z-index: 70; }
+
+.inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
+.sec-label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
+
+.item-row { display: grid; grid-template-columns: 1fr 70px 110px 34px; gap: 8px; margin-bottom: 8px; }
+.item-row input {
+    width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); color: var(--text); font-size: 14px; outline: none;
+}
+.item-row input:focus { border-color: var(--main); }
+.it-del { border: 1px solid var(--border); background: var(--bg); color: var(--muted); border-radius: 10px; cursor: pointer; }
+.add-item {
+    width: 100%; background: none; border: 1px dashed var(--main); color: var(--main);
+    border-radius: 10px; padding: 9px; cursor: pointer; font-weight: 600; margin: 4px 0 16px;
+}
+
+.preview-wrap { background: var(--bg); border: 1px solid var(--border); border-radius: 12px; padding: 12px; max-height: 68vh; overflow: auto; }
+
+.t-amber { color: var(--amber); }
+.due-tag { font-size: 11px; font-weight: 600; margin-top: 2px; }
+.paid-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.inv .limit-bar { width: 110px; }
+
+/* Invoice (hamesha safed, dark mode mein bhi, taake PDF sahi bane) */
+.bill { background: #fff; color: #1e293b; padding: 26px; font-size: 13px; line-height: 1.5; border-radius: 6px; }
+.bill-top { display: flex; justify-content: space-between; gap: 16px; margin-bottom: 20px; }
+.bill-co { font-size: 20px; font-weight: 700; color: #0f766e; }
+.bill-small { color: #64748b; font-size: 12px; }
+.bill-right { text-align: right; }
+.bill-title { font-size: 22px; font-weight: 700; letter-spacing: 2px; }
+.bill-to { margin-bottom: 16px; }
+.bill-to span { display: block; color: #64748b; font-size: 11px; text-transform: uppercase; }
+.bill-table { width: 100%; border-collapse: collapse; margin-bottom: 14px; }
+.bill-table th { background: #f1f5f9; text-align: left; padding: 8px; font-size: 11px; text-transform: uppercase; color: #475569; }
+.bill-table td { padding: 8px; border-bottom: 1px solid #e2e8f0; }
+.bill .r { text-align: right; }
+.bill-sum { margin-left: auto; width: 260px; }
+.bill-sum div { display: flex; justify-content: space-between; padding: 4px 0; }
+.bill-sum .grand { border-top: 2px solid #1e293b; margin-top: 4px; padding-top: 8px; font-weight: 700; font-size: 15px; }
+.bill-sum .due { color: #dc2626; font-weight: 700; }
+.bill-foot { margin-top: 24px; text-align: center; color: #64748b; font-size: 12px; }
+
+@media (max-width: 900px) { .inv-grid { grid-template-columns: 1fr; } }
