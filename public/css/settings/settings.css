@@ -16,6 +16,13 @@
     align-items: start;
 }
 
+/* Buttons aur fields website ka chuna hua font use karein */
+.settings-page button,
+.settings-page input,
+.settings-page select {
+    font-family: inherit;
+}
+
 /* ---------- Left menu ---------- */
 .settings-menu {
     background: var(--card);
@@ -72,6 +79,8 @@
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
+    flex-wrap: wrap;
+    gap: 14px;
     margin-bottom: 22px;
 }
 
@@ -135,6 +144,61 @@
     border-color: var(--main);
 }
 
+/* ---------- Validation ---------- */
+.required-star {
+    color: #e11d48;
+    font-weight: 700;
+    margin-left: 2px;
+}
+
+.text-input.is-invalid,
+input.is-invalid,
+select.is-invalid {
+    border-color: #e11d48 !important;
+    box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15) !important;
+}
+
+.field-error {
+    color: #e11d48;
+    font-size: 12px;
+    margin-top: 4px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.field-error::before {
+    content: "⚠";
+    font-size: 13px;
+}
+
+.alert {
+    padding: 12px 16px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    font-size: 14px;
+}
+
+.alert-success {
+    background-color: #d1fae5;
+    color: #065f46;
+    border: 1px solid #10b981;
+}
+
+.alert-danger {
+    background-color: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #e11d48;
+}
+
+.alert ul {
+    padding-left: 20px;
+    margin: 0;
+}
+
 /* ---------- Tabs ---------- */
 .tabs {
     display: grid;
@@ -168,38 +232,11 @@
     display: block;
 }
 
-/* ---------- Logos tab ---------- */
-/* ---------- Logo tab ---------- */
-.logo-box {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-    max-width: 420px;
-}
-
-.logo-preview {
-    height: 140px;
-    border: 2px dashed var(--border);
-    border-radius: 12px;
-    background: var(--bg);
-    color: var(--muted);
-    font-size: 14px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    overflow: hidden;
-}
-
-.logo-preview img {
-    max-width: 100%;
-    max-height: 100%;
-    object-fit: contain;
-}
-
-.logo-actions {
+/* ---------- Font tab ---------- */
+.font-row {
     display: flex;
     flex-wrap: wrap;
-    gap: 10px;
+    gap: 12px;
 }
 
 /* ---------- Theme tab ---------- */
@@ -207,6 +244,8 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
 .sub-heading {
@@ -277,6 +316,68 @@
 .dot-rose    { background: linear-gradient(135deg, #be123c, #f43f5e); }
 .dot-sky     { background: linear-gradient(135deg, #0e7490, #06b6d4); }
 
+/* Custom color */
+.custom-color-row {
+    margin: 22px 0;
+}
+
+.custom-color-box {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    max-width: 380px;
+    margin-top: 10px;
+}
+
+.custom-color-box input[type="text"] {
+    flex: 1;
+    min-width: 0;
+    height: 42px;
+    padding: 0 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    font-size: 14px;
+    outline: none;
+    background: var(--card);
+    color: var(--text);
+}
+
+.custom-color-box input[type="text"]:focus {
+    border-color: var(--main);
+}
+
+.save-color-btn {
+    height: 42px;
+    padding: 0 18px;
+    border: none;
+    border-radius: 10px;
+    background: var(--main);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.save-color-btn:hover {
+    background: var(--main-light);
+}
+
+.color-hint {
+    margin-top: 8px;
+    font-size: 12px;
+    color: var(--muted);
+}
+
+.color-msg {
+    margin-top: 6px;
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.color-msg.ok { color: #16a34a; }
+.color-msg.error { color: #dc2626; }
+
+/* Appearance mode */
 .mode-row {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -299,78 +400,8 @@
     background: var(--main-soft);
     color: var(--main);
 }
-.custom-color-row {
-    margin: 22px 0;
-}
 
-.custom-color-box {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    max-width: 380px;
-    margin-top: 10px;
-}
-
-.custom-color-box input[type="text"] {
-    flex: 1;
-    height: 42px;
-    padding: 0 14px;
-    border: 1px solid #d1d5db;
-    border-radius: 10px;
-    font-size: 14px;
-    font-family: inherit;
-    outline: none;
-    background: #fff;
-    color: #111827;
-}
-
-.custom-color-box input[type="text"]:focus {
-    border-color: var(--main);
-}
-
-.save-color-btn {
-    height: 42px;
-    padding: 0 18px;
-    border: none;
-    border-radius: 10px;
-    background: var(--main);
-    color: #fff;
-    font-size: 14px;
-    font-weight: 600;
-    font-family: inherit;
-    cursor: pointer;
-}
-
-.save-color-btn:hover {
-    background: var(--main-light);
-}
-
-.color-hint {
-    margin-top: 8px;
-    font-size: 12px;
-    color: #6b7280;
-}
-
-.color-msg {
-    margin-top: 6px;
-    font-size: 13px;
-    font-weight: 600;
-}
-
-.color-msg.ok { color: #16a34a; }
-.color-msg.error { color: #dc2626; }
-
-/* Dark mode */
-[data-mode="dark"] .custom-color-box input[type="text"] {
-    background: #1f2937;
-    border-color: #374151;
-    color: #f3f4f6;
-}
-
-[data-mode="dark"] .color-hint {
-    color: #9ca3af;
-}
-
+/* ---------- Logo tab ---------- */
 .lg-previews {
     display: grid;
     grid-template-columns: 1fr 1fr;
@@ -395,6 +426,7 @@
     font-size: 13px;
 }
 
+/* In do boxes ka rang jaan boojh kar fixed hai: logo dono mode mein kaisa lagega */
 .lg-light {
     background: #ffffff;
     border: 2px dashed #d1d5db;
@@ -419,6 +451,7 @@
     font-size: 13px;
     font-weight: 600;
 }
+
 .lg-msg.ok { color: #16a34a; }
 .lg-msg.error { color: #dc2626; }
 
@@ -428,129 +461,42 @@
     gap: 10px;
     margin-top: 14px;
 }
-.logo-img {
-    width: 36px;
-    height: 36px;
-    border-radius: 10px;
-    object-fit: contain;
-    flex-shrink: 0;
+
+/* ---------- Tablet ---------- */
+@media (max-width: 900px) {
+    .settings-page {
+        grid-template-columns: 1fr;
+    }
+
+    .tabs {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .color-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
 }
 
-.sidebar-logo {
-    max-width: 120px;
-    max-height: 48px;
-    object-fit: contain;
-    margin: 0 auto 10px;
-}
-
+/* ---------- Phone ---------- */
 @media (max-width: 600px) {
-    .lg-previews { grid-template-columns: 1fr; }
-}
-/* ============ INVALID FIELD STYLING ============ */
-.text-input.is-invalid,
-input.is-invalid,
-select.is-invalid {
-    border-color: #e11d48 !important;
-    box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15) !important;
-    background-color: #fef2f2;
-}
+    .settings-card {
+        padding: 18px;
+    }
 
-.field-error {
-    color: #e11d48;
-    font-size: 12px;
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
+    .two-cols {
+        grid-template-columns: 1fr;
+        gap: 0;
+    }
 
-.field-error::before {
-    content: "⚠";
-    font-size: 14px;
-}
+    .lg-previews {
+        grid-template-columns: 1fr;
+    }
 
-/* Success / Error Alerts */
-.alert {
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 14px;
-}
+    .mode-row {
+        grid-template-columns: 1fr;
+    }
 
-.alert-success {
-    background-color: #d1fae5;
-    color: #065f46;
-    border: 1px solid #10b981;
-}
-
-.alert-danger {
-    background-color: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #e11d48;
-}
-
-.alert ul {
-    padding-left: 20px;
-    margin: 0;
-}
-/* ============ REQUIRED STAR ============ */
-.required-star {
-    color: #e11d48;
-    font-weight: 700;
-    margin-left: 2px;
-}
-
-/* ============ INVALID FIELD ============ */
-.text-input.is-invalid,
-input.is-invalid,
-select.is-invalid {
-    border-color: #e11d48 !important;
-    box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15) !important;
-    background-color: #fef2f2;
-}
-
-/* ============ FIELD ERROR MESSAGE ============ */
-.field-error {
-    color: #e11d48;
-    font-size: 12px;
-    margin-top: 4px;
-    display: flex;
-    align-items: center;
-    gap: 4px;
-}
-
-.field-error::before {
-    content: "⚠";
-    font-size: 13px;
-}
-
-/* ============ SUCCESS / ERROR ALERTS ============ */
-.alert {
-    padding: 12px 16px;
-    border-radius: 8px;
-    margin-bottom: 16px;
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    font-size: 14px;
-}
-
-.alert-success {
-    background-color: #d1fae5;
-    color: #065f46;
-    border: 1px solid #10b981;
-}
-
-.alert-danger {
-    background-color: #fee2e2;
-    color: #991b1b;
-    border: 1px solid #e11d48;
-}
-
-.alert ul {
-    padding-left: 20px;
-    margin: 0;
+    .custom-color-box {
+        flex-wrap: wrap;
+    }
 }

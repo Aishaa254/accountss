@@ -30,6 +30,7 @@
 
     <div class="settings-main">
 
+        <!-- ========== BRAND SETTINGS ========== -->
         <div class="section active" id="section-brand">
             <div class="settings-card">
                 <div class="settings-top">
@@ -74,7 +75,7 @@
                         <button class="reset-btn" id="reset-theme"><i class="fa-solid fa-rotate-left"></i> Reset to Default</button>
                     </div>
 
-                    <div class="color-grid" id="colorGrid">
+                    <div class="color-grid">
                         <button class="color-box" data-theme="emerald"><span class="color-dot dot-emerald"></span><span class="color-name">Emerald</span></button>
                         <button class="color-box" data-theme="ocean"><span class="color-dot dot-ocean"></span><span class="color-name">Ocean Blue</span></button>
                         <button class="color-box" data-theme="purple"><span class="color-dot dot-purple"></span><span class="color-name">Royal Purple</span></button>
@@ -82,18 +83,15 @@
                         <button class="color-box" data-theme="rose"><span class="color-dot dot-rose"></span><span class="color-name">Rose</span></button>
                         <button class="color-box" data-theme="sky"><span class="color-dot dot-sky"></span><span class="color-name">Cyan Sky</span></button>
                     </div>
-
                     <div class="custom-color-row">
-                        <h4 class="sub-heading">Add Custom Color</h4>
+                        <h4 class="sub-heading">Custom Color</h4>
                         <div class="custom-color-box">
-                            <input type="text" id="customName" placeholder="Name (e.g. My Blue)" maxlength="16">
                             <input type="text" id="customColor" placeholder="#ff5500" maxlength="7">
-                            <button type="button" class="save-color-btn" id="saveColor">Save</button>
+                            <button type="button" class="save-color-btn" id="saveColor">Save Color</button>
                         </div>
-                        <p class="color-hint">Write a name and a color code, it will be added to the palette above</p>
+                        <p class="color-hint">Write your own color code like #ff5500</p>
                         <p class="color-msg" id="colorMsg"></p>
                     </div>
-
                     <h4 class="sub-heading">Appearance Mode</h4>
                     <div class="mode-row">
                         <button class="mode-btn" data-mode="light"><i class="fa-regular fa-sun"></i> Light</button>
@@ -135,6 +133,7 @@
             </div>
         </div>
 
+        <!-- ========== SYSTEM SETTINGS ========== -->
         <div class="section" id="section-system">
             <div class="settings-card">
                 <div class="settings-top">
@@ -154,14 +153,6 @@
                         </select>
                     </div>
                     <div>
-                        <label class="label">Date Format</label>
-                        <select class="text-input">
-                            <option>DD-MM-YYYY</option>
-                            <option>MM-DD-YYYY</option>
-                            <option>YYYY-MM-DD</option>
-                        </select>
-                    </div>
-                    <div>
                         <label class="label">Time Zone</label>
                         <select class="text-input">
                             <option>Asia/Karachi</option>
@@ -169,34 +160,77 @@
                             <option>UTC</option>
                         </select>
                     </div>
+                    <div>
+                        <label class="label">Date Format</label>
+                        <select class="text-input" id="dateFormat" name="date_format">
+                            <option>DD-MM-YYYY</option>
+                            <option>MM-DD-YYYY</option>
+                            <option>YYYY-MM-DD</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Time Format</label>
+                        <select class="text-input" id="timeFormat" name="time_format">
+                            <option>12 Hour (02:30 PM)</option>
+                            <option>24 Hour (14:30)</option>
+                        </select>
+                    </div>
                 </div>
             </div>
         </div>
 
+        <!-- ========== COMPANY SETTINGS ========== -->
         <div class="section" id="section-company">
             <div class="settings-card">
-                <div class="settings-top">
-                    <div>
-                        <h3 class="settings-heading"><i class="fa-solid fa-building"></i> Company Settings</h3>
-                        <p class="settings-small">Your company details shown on invoices</p>
+                <form method="POST" action="{{ route('company.save') }}">
+                    @csrf
+                    <div class="settings-top">
+                        <div>
+                            <h3 class="settings-heading"><i class="fa-solid fa-building"></i> Company Settings</h3>
+                            <p class="settings-small">Your company details shown on invoices</p>
+                        </div>
+                        <button type="submit" class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                     </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
-                </div>
-                <div class="two-cols">
-                    <div>
-                        <label class="label">Company Name</label>
-                        <input type="text" class="text-input" placeholder="Your company name">
+                    <div class="two-cols">
+                        <div>
+                            <label class="label">Company Name</label>
+                            <input type="text" class="text-input" id="companyName" name="company_name" placeholder="Your company name" value="{{ $company->company_name ?? '' }}">
+                        </div>
+                        <div>
+                            <label class="label">Registration Number</label>
+                            <input type="text" class="text-input" id="companyReg" name="registration_number" placeholder="Registration number" value="{{ $company->registration_number ?? '' }}">
+                        </div>
+                        <div>
+                            <label class="label">Phone Number</label>
+                            <input type="text" class="text-input" id="companyPhone" name="phone" placeholder="Phone number" value="{{ $company->phone ?? '' }}">
+                        </div>
+                        <div>
+                            <label class="label">Company Email</label>
+                            <input type="email" class="text-input" id="companyEmail" name="email" placeholder="company@example.com" value="{{ $company->email ?? '' }}">
+                        </div>
+                        <div>
+                            <label class="label">Date Format</label>
+                            <select class="text-input" id="dateFormat" name="date_format">
+                                <option {{ ($company->date_format ?? '') == 'DD-MM-YYYY' ? 'selected' : '' }}>DD-MM-YYYY</option>
+                                <option {{ ($company->date_format ?? '') == 'MM-DD-YYYY' ? 'selected' : '' }}>MM-DD-YYYY</option>
+                                <option {{ ($company->date_format ?? '') == 'YYYY-MM-DD' ? 'selected' : '' }}>YYYY-MM-DD</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label">Time Format</label>
+                            <select class="text-input" id="timeFormat" name="time_format">
+                                <option {{ ($company->time_format ?? '') == '12 Hour (02:30 PM)' ? 'selected' : '' }}>12 Hour (02:30 PM)</option>
+                                <option {{ ($company->time_format ?? '') == '24 Hour (14:30)' ? 'selected' : '' }}>24 Hour (14:30)</option>
+                            </select>
+                        </div>
                     </div>
-                    <div>
-                        <label class="label">NTN / Tax Number</label>
-                        <input type="text" class="text-input" placeholder="Tax number">
-                    </div>
-                </div>
-                <label class="label">Address</label>
-                <input type="text" class="text-input" placeholder="Company address">
+                    <label class="label">Address</label>
+                    <input type="text" class="text-input" id="companyAddress" name="address" placeholder="Company address" value="{{ $company->address ?? '' }}">
+                </form>
             </div>
         </div>
 
+        <!-- ========== CURRENCY SETTINGS ========== -->
         <div class="section" id="section-currency">
             <div class="settings-card">
                 <div class="settings-top">
@@ -228,6 +262,7 @@
             </div>
         </div>
 
+        <!-- ========== EMAIL SETTINGS ========== -->
         <div class="section" id="section-email">
             <div class="settings-card">
                 <div class="settings-top">
@@ -258,6 +293,7 @@
             </div>
         </div>
 
+        <!-- ========== CONTACT SETTINGS ========== -->
         <div class="section" id="section-contact">
             <div class="settings-card">
                 <div class="settings-top">

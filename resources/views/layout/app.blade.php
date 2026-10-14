@@ -1,10 +1,3 @@
-@php
-try {
-$appSettings = \App\Models\Setting::pluck('value', 'key')->toArray();
-} catch (\Throwable $e) {
-$appSettings = [];
-}
-@endphp
 <!DOCTYPE html>
 <html lang="en">
 
@@ -17,10 +10,6 @@ $appSettings = [];
     <link rel="stylesheet" href="{{ asset('css/style.css') }}">
     <link rel="stylesheet" href="{{ asset('css/layout/sidebar.css') }}">
     <link rel="stylesheet" href="{{ asset('css/layout/navbar.css') }}">
-    <meta name="csrf-token" content="{{ csrf_token() }}">
-    <meta name="app-settings" content="{{ json_encode((object) $appSettings) }}">
-    <meta name="settings-save-url" content="{{ url('/settings/save') }}">
-    <script src="{{ asset('js/settings-sync.js') }}"></script>
     <script src="{{ asset('js/theme.js') }}"></script>
 
     @stack('styles')

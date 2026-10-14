@@ -1,13 +1,14 @@
 <?php
-use App\Http\Controllers\SettingController;
 use Illuminate\Support\Facades\Route;
-
+use App\Http\Controllers\CompanySettingController;
+use App\Models\CompanySetting;
 Route::get('/', function () {
     return view('pages.dashboard.dashboard');
 });
 
 Route::get('/settings', function () {
-    return view('pages.settings.settings');
+    $company = CompanySetting::first();
+    return view('pages.settings.settings', compact('company'));
 });
 Route::get('/customers', function () {
     return view('pages.customers.customers');
@@ -15,15 +16,13 @@ Route::get('/customers', function () {
 Route::get('/invoices', function () {
     return view('pages.invoices.invoices');
 });
-
-Route::prefix('settings')->name('settings.')->group(function () {
-    Route::get('/',          [SettingController::class, 'index'])->name('index');
-    Route::post('/brand',    [SettingController::class, 'saveBrand'])->name('brand');
-    Route::post('/system',   [SettingController::class, 'saveSystem'])->name('system');
-    Route::post('/company',  [SettingController::class, 'saveCompany'])->name('company');
-    Route::post('/currency', [SettingController::class, 'saveCurrency'])->name('currency');
-    Route::post('/email',    [SettingController::class, 'saveEmail'])->name('email');
-    Route::post('/contact',  [SettingController::class, 'saveContact'])->name('contact');
+Route::get('/vendors', function () {
+    return view('pages.vendors.vendors');
 });
-
-Route::post('/settings/save', [SettingController::class, 'save'])->name('settings.save');
+Route::get('/purchases', function () {
+    return view('pages.purchases.purchases');
+});
+Route::get('/expenses',function(){
+    return view('pages.expenses.expenses');
+});
+Route::post('/settings/company', [CompanySettingController::class, 'save'])->name('company.save');

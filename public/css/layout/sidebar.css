@@ -33,6 +33,19 @@
     align-items: center;
     justify-content: center;
     font-weight: bold;
+    flex-shrink: 0;
+}
+
+/* Upload kiya hua logo: "A" icon ke barabar size, chahe image kitni bhi badi ho */
+#sidebarLogo,
+.logo-img {
+    width: 36px;
+    height: 36px;
+    max-width: 36px;
+    max-height: 36px;
+    flex-shrink: 0;
+    border-radius: 10px;
+    object-fit: contain;
 }
 
 .logo-light-mode,
@@ -69,7 +82,7 @@
     text-decoration: none;
     border-radius: 10px;
     font-size: 15px;
-    margin-bottom: 3px;
+    margin-bottom: 0px;
     transition: 0.2s;
 }
 

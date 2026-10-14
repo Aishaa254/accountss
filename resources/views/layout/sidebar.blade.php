@@ -19,15 +19,15 @@
     </a>
 
     <p class="menu-title">Purchase</p>
-    <a href="#" class="menu-link">
+    <a href="/vendors" class="menu-link {{ request()->is('vendors') ? 'active' : '' }}">
         <i class="fa-solid fa-truck"></i> Vendors
     </a>
-    <a href="#" class="menu-link">
+    <a href="/purchases" class="menu-link {{ request()->is('purchases') ? 'active' : '' }}">
         <i class="fa-solid fa-cart-shopping"></i> Purchases
     </a>
 
     <p class="menu-title">Accounting</p>
-    <a href="#" class="menu-link">
+    <a href="/expenses" class="menu-link {{ request()->is('expenses') ? 'active' : '' }}">
         <i class="fa-solid fa-wallet"></i> Expenses
     </a>
     <a href="#" class="menu-link">
@@ -38,8 +38,4 @@
     <a href="/settings" class="menu-link">
         <i class="fa-solid fa-gear"></i> Settings
     </a>
-    <a href="#" class="menu-link">
-        <i class="fa-solid fa-user-gear"></i> Profile
-    </a>
-
 </aside>

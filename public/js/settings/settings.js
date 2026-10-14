@@ -1,324 +1,221 @@
-/* =========================================================
- |  SETTINGS PAGE — JavaScript
- ========================================================= */
- document.addEventListener('DOMContentLoaded', function () {
+// Menu: ek waqt mein ek section
+var menuLinks = document.querySelectorAll('.settings-link');
+var sections = document.querySelectorAll('.section');
 
-    /* =========================================================
-     |  1. SIDEBAR — Section Switching
-     ========================================================= */
-    const settingsLinks = document.querySelectorAll('.settings-link');
-    const sections      = document.querySelectorAll('.section');
+menuLinks.forEach(function (link) {
+    link.addEventListener('click', function (event) {
+        event.preventDefault();
 
-    settingsLinks.forEach(link => {
-        link.addEventListener('click', function (e) {
-            e.preventDefault();
+        menuLinks.forEach(function (l) { l.classList.remove('active'); });
+        sections.forEach(function (s) { s.classList.remove('active'); });
 
-            settingsLinks.forEach(l => l.classList.remove('active'));
-            this.classList.add('active');
-
-            sections.forEach(s => s.classList.remove('active'));
-            const target = document.getElementById(this.dataset.section);
-            if (target) target.classList.add('active');
-        });
-    });
-
-    /* =========================================================
-     |  2. TABS — Brand section
-     ========================================================= */
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            const parent = this.closest('.settings-card');
-            parent.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
-            parent.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-
-            this.classList.add('active');
-            const target = parent.querySelector('#' + this.dataset.tab);
-            if (target) target.classList.add('active');
-        });
-    });
-
-    /* =========================================================
-     |  3. FONT SELECTION
-     ========================================================= */
-    document.querySelectorAll('.font-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const input = document.getElementById('input-font');
-            if (input) input.value = this.dataset.font;
-        });
-    });
-
-    /* =========================================================
-     |  4. THEME COLOR PRESET
-     ========================================================= */
-    document.querySelectorAll('.color-box').forEach(box => {
-        box.addEventListener('click', function () {
-            document.querySelectorAll('.color-box').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const input = document.getElementById('input-theme-color');
-            if (input) input.value = this.dataset.theme;
-        });
-    });
-
-    /* =========================================================
-     |  5. CUSTOM COLOR
-     ========================================================= */
-    const saveColorBtn = document.getElementById('saveColor');
-    if (saveColorBtn) {
-        saveColorBtn.addEventListener('click', function () {
-            const input = document.getElementById('customColor');
-            const msg = document.getElementById('colorMsg');
-            const val = input.value.trim();
-
-            if (!val) {
-                msg.textContent = 'Please enter a color code.';
-                msg.style.color = '#e11d48';
-                return;
-            }
-            if (/^#([A-Fa-f0-9]{3}){1,2}$/.test(val)) {
-                document.getElementById('input-theme-color').value = val;
-                msg.textContent = '✓ Color applied. Click Save Changes to store.';
-                msg.style.color = '#10b981';
-            } else {
-                msg.textContent = '✗ Invalid hex code. Use format like #ff5500';
-                msg.style.color = '#e11d48';
-            }
-        });
-    }
-
-    /* =========================================================
-     |  6. APPEARANCE MODE
-     ========================================================= */
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        btn.addEventListener('click', function () {
-            document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            const input = document.getElementById('input-appearance');
-            if (input) input.value = this.dataset.mode;
-        });
-    });
-
-    /* =========================================================
-     |  7. LOGO UPLOAD PREVIEW
-     ========================================================= */
-    const lgFile   = document.getElementById('lgFile');
-    const lgChoose = document.getElementById('lgChoose');
-    const lgRemove = document.getElementById('lgRemove');
-    const lgMsg    = document.getElementById('lgMsg');
-
-    if (lgChoose && lgFile) {
-        lgChoose.addEventListener('click', () => lgFile.click());
-    }
-
-    if (lgFile) {
-        lgFile.addEventListener('change', function () {
-            const file = this.files[0];
-            if (!file) return;
-
-            if (file.size > 4194304) {
-                if (lgMsg) {
-                    lgMsg.textContent = '✗ File too big. Maximum 4MB allowed.';
-                    lgMsg.style.color = '#e11d48';
-                }
-                this.value = '';
-                return;
-            }
-
-            const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml'];
-            if (!allowed.includes(file.type)) {
-                if (lgMsg) {
-                    lgMsg.textContent = '✗ Only PNG, JPG or SVG allowed.';
-                    lgMsg.style.color = '#e11d48';
-                }
-                this.value = '';
-                return;
-            }
-
-            if (lgMsg) {
-                lgMsg.textContent = '✓ File selected: ' + file.name;
-                lgMsg.style.color = '#10b981';
-            }
-
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                document.querySelectorAll('.lg-img').forEach(img => {
-                    img.src = e.target.result;
-                    img.style.display = '';
-                });
-                document.querySelectorAll('.lg-empty').forEach(el => {
-                    el.style.display = 'none';
-                });
-            };
-            reader.readAsDataURL(file);
-        });
-    }
-
-    if (lgRemove && lgFile) {
-        lgRemove.addEventListener('click', function () {
-            lgFile.value = '';
-            document.querySelectorAll('.lg-img').forEach(img => {
-                img.src = '';
-                img.style.display = 'none';
-            });
-            document.querySelectorAll('.lg-empty').forEach(el => {
-                el.style.display = '';
-            });
-            if (lgMsg) {
-                lgMsg.textContent = '✓ Logo removed. Click Save Changes to store.';
-                lgMsg.style.color = '#10b981';
-            }
-        });
-    }
-
-    /* =========================================================
-     |  8. COMPANY FORM — CUSTOM VALIDATION (novalidate)
-     ========================================================= */
-    const companyForm = document.getElementById('companyForm');
-    if (!companyForm) return;
-
-    const rules = {
-        company_name: {
-            required: true,
-            minLength: 2,
-            maxLength: 255,
-            pattern: /^[A-Za-z0-9\s\.\,\-\&\'\(\)]+$/,
-            messages: {
-                required: 'Company name is required.',
-                minLength: 'Company name must be at least 2 characters.',
-                maxLength: 'Company name must not exceed 255 characters.',
-                pattern: "Only letters, numbers, spaces, and . , - & ' ( ) are allowed.",
-            },
-        },
-        registration_number: {
-            required: true,
-            minLength: 3,
-            maxLength: 100,
-            pattern: /^[A-Za-z0-9\-\/]+$/,
-            messages: {
-                required: 'Registration number is required.',
-                minLength: 'Registration number must be at least 3 characters.',
-                maxLength: 'Registration number must not exceed 100 characters.',
-                pattern: 'Only letters, numbers, - and / are allowed.',
-            },
-        },
-        phone: {
-            required: true,
-            minLength: 7,
-            maxLength: 50,
-            pattern: /^[0-9+\-\s()]+$/,
-            messages: {
-                required: 'Phone number is required.',
-                minLength: 'Phone number must be at least 7 characters.',
-                maxLength: 'Phone number must not exceed 50 characters.',
-                pattern: 'Only digits and + - ( ) are allowed.',
-            },
-        },
-        email: {
-            required: true,
-            maxLength: 255,
-            email: true,
-            messages: {
-                required: 'Company email is required.',
-                maxLength: 'Email must not exceed 255 characters.',
-                email: 'Please enter a valid email address.',
-            },
-        },
-        address: {
-            required: false,
-            maxLength: 500,
-            messages: {
-                maxLength: 'Address must not exceed 500 characters.',
-            },
-        },
-    };
-
-    function showError(input, message) {
-        input.classList.add('is-invalid');
-        const old = input.parentElement.querySelector('.field-error[data-js="true"]');
-        if (old) old.remove();
-
-        const p = document.createElement('p');
-        p.className = 'field-error';
-        p.dataset.js = 'true';
-        p.textContent = message;
-        input.parentElement.appendChild(p);
-    }
-
-    function clearError(input) {
-        input.classList.remove('is-invalid');
-        const err = input.parentElement.querySelector('.field-error[data-js="true"]');
-        if (err) err.remove();
-    }
-
-    function validateField(input) {
-        const name = input.name;
-        const rule = rules[name];
-        if (!rule) return true;
-
-        const value = input.value.trim();
-
-        if (rule.required && value === '') {
-            showError(input, rule.messages.required);
-            return false;
-        }
-        if (!rule.required && value === '') {
-            clearError(input);
-            return true;
-        }
-        if (rule.minLength && value.length < rule.minLength) {
-            showError(input, rule.messages.minLength);
-            return false;
-        }
-        if (rule.maxLength && value.length > rule.maxLength) {
-            showError(input, rule.messages.maxLength);
-            return false;
-        }
-        if (rule.pattern && !rule.pattern.test(value)) {
-            showError(input, rule.messages.pattern);
-            return false;
-        }
-        if (rule.email) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(value)) {
-                showError(input, rule.messages.email);
-                return false;
-            }
-        }
-        clearError(input);
-        return true;
-    }
-
-    // Live validation
-    companyForm.querySelectorAll('input, select').forEach(input => {
-        input.addEventListener('blur', () => validateField(input));
-        input.addEventListener('input', () => {
-            if (input.classList.contains('is-invalid')) {
-                validateField(input);
-            }
-        });
-    });
-
-    // Submit validation
-    companyForm.addEventListener('submit', function (e) {
-        let valid = true;
-        let firstInvalid = null;
-
-        ['company_name', 'registration_number', 'phone', 'email', 'address'].forEach(name => {
-            const input = companyForm.querySelector(`[name="${name}"]`);
-            if (!input) return;
-            if (!validateField(input)) {
-                valid = false;
-                if (!firstInvalid) firstInvalid = input;
-            }
-        });
-
-        if (!valid) {
-            e.preventDefault();
-            if (firstInvalid) {
-                firstInvalid.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                firstInvalid.focus();
-            }
-        }
+        link.classList.add('active');
+        document.getElementById(link.dataset.section).classList.add('active');
     });
 });
+
+// Tabs: Font / Text / Theme / Logo
+var tabButtons = document.querySelectorAll('.tab-btn');
+var tabPanels = document.querySelectorAll('.tab-panel');
+
+tabButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+        tabButtons.forEach(function (b) { b.classList.remove('active'); });
+        tabPanels.forEach(function (p) { p.classList.remove('active'); });
+
+        button.classList.add('active');
+        document.getElementById(button.dataset.tab).classList.add('active');
+    });
+});
+
+// Theme colors
+var colorBoxes = document.querySelectorAll('.color-box');
+
+function markColor(name) {
+    colorBoxes.forEach(function (box) {
+        box.classList.toggle('active', box.dataset.theme === name);
+    });
+}
+
+markColor(localStorage.getItem('theme') || 'emerald');
+
+colorBoxes.forEach(function (box) {
+    box.addEventListener('click', function () {
+        var name = box.dataset.theme;
+        applyTheme(name);
+        localStorage.setItem('theme', name);
+        markColor(name);
+    });
+});
+
+document.getElementById('reset-theme').addEventListener('click', function () {
+    applyTheme('emerald');
+    localStorage.removeItem('theme');
+    markColor('emerald');
+});
+
+// Light / Dark mode
+var modeButtons = document.querySelectorAll('.mode-btn');
+
+function markMode(mode) {
+    modeButtons.forEach(function (button) {
+        button.classList.toggle('active', button.dataset.mode === mode);
+    });
+}
+
+markMode(localStorage.getItem('mode') || 'light');
+
+modeButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+        var mode = button.dataset.mode;
+        applyMode(mode);
+        localStorage.setItem('mode', mode);
+        markMode(mode);
+    });
+});
+
+// Font
+var fontButtons = document.querySelectorAll('.font-btn');
+
+function markFont(name) {
+    fontButtons.forEach(function (button) {
+        button.classList.toggle('active', button.dataset.font === name);
+    });
+}
+
+markFont(localStorage.getItem('font') || 'segoe');
+
+fontButtons.forEach(function (button) {
+    button.addEventListener('click', function () {
+        var name = button.dataset.font;
+        applyFont(name);
+        localStorage.setItem('font', name);
+        markFont(name);
+    });
+});
+
+// ===== Logo (Light / Dark preview) =====
+(function () {
+    var file = document.getElementById('lgFile');
+    var chooseBtn = document.getElementById('lgChoose');
+    var saveBtn = document.getElementById('lgSave');
+    var removeBtn = document.getElementById('lgRemove');
+    var msg = document.getElementById('lgMsg');
+    if (!file || !chooseBtn || !saveBtn || !removeBtn) { return; }
+
+    var imgs = document.querySelectorAll('#tab-logo .lg-img');
+    var empties = document.querySelectorAll('#tab-logo .lg-empty');
+    var pending = null;
+
+    function show(text, type) {
+        msg.textContent = text;
+        msg.className = 'lg-msg ' + type;
+    }
+
+    function showPreview(src) {
+        imgs.forEach(function (img) {
+            if (src) {
+                img.src = src;
+                img.style.display = 'block';
+            } else {
+                img.removeAttribute('src');
+                img.style.display = 'none';
+            }
+        });
+        empties.forEach(function (e) {
+            e.style.display = src ? 'none' : 'block';
+        });
+    }
+
+    // Sidebar ka logo theme.js wala function lagata hai
+    function updateSidebar() {
+        if (typeof applySidebarLogo === 'function') {
+            applySidebarLogo();
+        }
+    }
+
+    // Page khulte hi saved logo dikhao
+    showPreview(localStorage.getItem('brandLogo'));
+    updateSidebar();
+
+    chooseBtn.addEventListener('click', function () {
+        file.click();
+    });
+
+    file.addEventListener('change', function () {
+        var f = file.files[0];
+        if (!f) { return; }
+
+        // SVG already halki hoti hai, usay waise hi rakho
+        if (f.type === 'image/svg+xml') {
+            if (f.size > 200 * 1024) {
+                show('SVG file is too big', 'error');
+                file.value = '';
+                return;
+            }
+            var svgReader = new FileReader();
+            svgReader.onload = function () {
+                pending = svgReader.result;
+                showPreview(pending);
+                show('Looks good? Click Save Logo', 'ok');
+            };
+            svgReader.readAsDataURL(f);
+            return;
+        }
+
+        // PNG / JPG: badi ho to khud chhoti kar do
+        if (f.size > 10 * 1024 * 1024) {
+            show('Image is too big (maximum 10 MB)', 'error');
+            file.value = '';
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function () {
+            var img = new Image();
+            img.onload = function () {
+                var maxSize = 400;
+                var scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                pending = canvas.toDataURL('image/png');
+                showPreview(pending);
+                show('Looks good? Click Save Logo', 'ok');
+            };
+            img.onerror = function () {
+                show('This image could not be read', 'error');
+            };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+    });
+
+    saveBtn.addEventListener('click', function () {
+        if (!pending) {
+            show('Choose an image first', 'error');
+            return;
+        }
+        try {
+            localStorage.setItem('brandLogo', pending);
+        } catch (e) {
+            show('Could not save, try a smaller image', 'error');
+            return;
+        }
+        pending = null;
+        file.value = '';
+        updateSidebar();
+        show('Logo saved', 'ok');
+    });
+
+    removeBtn.addEventListener('click', function () {
+        localStorage.removeItem('brandLogo');
+        pending = null;
+        file.value = '';
+        showPreview(null);
+        updateSidebar();
+        show('Logo removed', 'ok');
+    });
+})();

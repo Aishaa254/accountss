@@ -1,0 +1,3 @@
+.ex-actions { white-space: nowrap; text-align: right; }
+.ex-del:hover { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.vd-table tbody tr { cursor: default; }
