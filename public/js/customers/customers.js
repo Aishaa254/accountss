@@ -39,6 +39,7 @@ var nextId = 7;
 var currentFilter = 'all';
 var editingId = null;
 var openId = null;
+var menuId = null;
 var avatarColors = ['#0f766e', '#6d28d9', '#c2410c', '#be123c', '#1d4ed8', '#0e7490'];
 
 // ---------- Chhote helper functions ----------
@@ -50,7 +51,7 @@ function esc(text) {
     });
 }
 
-function money(n) { return 'Rs ' + Math.abs(n).toLocaleString('en-US'); }
+function money(n) { return formatMoney(Math.abs(n)); }
 
 // Balance = opening + debit - credit. Plus = receivable, minus = payable
 function balanceOf(c) {
@@ -66,6 +67,10 @@ function usedPercent(c) {
 }
 
 function isOverLimit(c) { return c.limit > 0 && balanceOf(c) > c.limit; }
+
+function findCustomer(id) {
+    return customers.find(function (x) { return x.id === id; });
+}
 
 function avatarOf(c, big) {
     var color = avatarColors[c.id % avatarColors.length];
@@ -85,7 +90,7 @@ function balanceHtml(c) {
     var b = balanceOf(c);
     if (b > 0) return '<span class="bal t-red">' + money(b) + '<small>they owe us</small></span>';
     if (b < 0) return '<span class="bal t-green">' + money(b) + '<small>we owe them</small></span>';
-    return '<span class="bal">Rs 0<small>all clear</small></span>';
+    return '<span class="bal">' + money(0) + '<small>all clear</small></span>';
 }
 
 function waLink(c) {
@@ -149,12 +154,7 @@ function renderTable() {
                 '<div class="limit-text">' + (c.limit ? pct + '% of ' + money(c.limit) : 'No limit set') + '</div></td>' +
             '<td>' + statusBadge(c) + '</td>' +
             '<td><div class="acts">' +
-                '<button class="act" data-act="invoice" title="Create invoice"><i class="fa-solid fa-file-invoice"></i></button>' +
-                '<button class="act" data-act="payment" title="Receive payment"><i class="fa-solid fa-money-bill-wave"></i></button>' +
-                '<a class="act" href="' + waLink(c) + '" target="_blank" title="WhatsApp"><i class="fa-brands fa-whatsapp"></i></a>' +
-                '<a class="act" href="tel:' + esc(c.phone.replace(/\s/g, '')) + '" title="Call"><i class="fa-solid fa-phone"></i></a>' +
-                '<button class="act" data-act="edit" title="Edit"><i class="fa-solid fa-pen"></i></button>' +
-                '<button class="act" data-act="toggle" title="' + (c.active ? 'Make inactive' : 'Make active') + '"><i class="fa-solid ' + (c.active ? 'fa-user-slash' : 'fa-user-check') + '"></i></button>' +
+                '<button class="act" data-act="menu" title="More actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>' +
             '</div></td></tr>';
     });
 
@@ -169,9 +169,79 @@ function renderAll() {
     if (openId) openPanel(openId, true);
 }
 
+// ---------- 3 dots ka menu ----------
+var menu = document.createElement('div');
+menu.className = 'cust-menu';
+menu.style.display = 'none';
+document.body.appendChild(menu);
+
+function menuButton(action, icon, label) {
+    return '<button type="button" class="cust-menu-item" data-action="' + action + '"><i class="' + icon + '"></i>' + label + '</button>';
+}
+
+function menuLink(href, icon, label, newTab) {
+    return '<a class="cust-menu-item" href="' + href + '"' + (newTab ? ' target="_blank" rel="noopener"' : '') + '><i class="' + icon + '"></i>' + label + '</a>';
+}
+
+function closeMenu() {
+    menu.style.display = 'none';
+    menuId = null;
+}
+
+function openMenu(btn, c) {
+    var html = '';
+    html += menuButton('invoice', 'fa-solid fa-file-invoice', 'Create Invoice');
+    html += menuButton('payment', 'fa-solid fa-money-bill-wave', 'Receive Payment');
+    html += '<div class="cust-menu-sep"></div>';
+    html += menuLink(waLink(c), 'fa-brands fa-whatsapp', 'WhatsApp', true);
+    html += menuLink('tel:' + c.phone.replace(/\s/g, ''), 'fa-solid fa-phone', 'Call');
+    html += '<div class="cust-menu-sep"></div>';
+    html += menuButton('edit', 'fa-solid fa-pen', 'Edit');
+    html += menuButton('toggle', c.active ? 'fa-solid fa-user-slash' : 'fa-solid fa-user-check', c.active ? 'Make inactive' : 'Make active');
+
+    menu.innerHTML = html;
+    menu.style.display = 'block';
+    menuId = c.id;
+
+    var r = btn.getBoundingClientRect();
+    var mh = menu.offsetHeight;
+    var mw = menu.offsetWidth;
+    var top = r.bottom + 6;
+    if (top + mh > window.innerHeight - 10) top = r.top - mh - 6;
+    var left = r.right - mw;
+    if (left < 10) left = 10;
+
+    menu.style.top = Math.max(10, top) + 'px';
+    menu.style.left = left + 'px';
+}
+
+menu.addEventListener('click', function (e) {
+    var item = e.target.closest('.cust-menu-item');
+    if (!item) return;
+
+    var action = item.getAttribute('data-action');
+    var c = findCustomer(menuId);
+    closeMenu();
+
+    if (!action || !c) return; // WhatsApp / Call links khud khulte hain
+
+    if (action === 'edit') openModal(c.id);
+    else if (action === 'toggle') {
+        c.active = !c.active;
+        toast(c.active ? 'Customer is activated' : 'Customer is inactivated');
+        renderAll();
+    } else placeholderAction(action);
+});
+
+document.addEventListener('click', function (e) {
+    if (!menu.contains(e.target) && !e.target.closest('[data-act="menu"]')) closeMenu();
+});
+window.addEventListener('scroll', closeMenu, true);
+window.addEventListener('resize', closeMenu);
+
 // ---------- Detail panel ----------
 function openPanel(id, keepTab) {
-    var c = customers.find(function (x) { return x.id === id; });
+    var c = findCustomer(id);
     if (!c) return;
     openId = id;
 
@@ -213,8 +283,8 @@ function openPanel(id, keepTab) {
             '<button class="icon-x p-close" id="panel-close"><i class="fa-solid fa-xmark"></i></button>' +
         '</div>' +
         '<div class="p-cards">' +
-            '<div class="p-card"><span>Receivable</span><b class="t-red">' + (b > 0 ? money(b) : 'Rs 0') + '</b></div>' +
-            '<div class="p-card"><span>Payable</span><b class="t-green">' + (b < 0 ? money(b) : 'Rs 0') + '</b></div>' +
+            '<div class="p-card"><span>Receivable</span><b class="t-red">' + (b > 0 ? money(b) : money(0)) + '</b></div>' +
+            '<div class="p-card"><span>Payable</span><b class="t-green">' + (b < 0 ? money(b) : money(0)) + '</b></div>' +
             '<div class="p-card"><span>Limit used</span><b>' + (c.limit ? pct + '%' : '-') + '</b></div>' +
         '</div>' +
         '<div class="p-tabs">' +
@@ -267,7 +337,7 @@ function closePanel() {
 function openModal(id) {
     editingId = id || null;
     $('form-error').textContent = '';
-    var c = id ? customers.find(function (x) { return x.id === id; }) : null;
+    var c = id ? findCustomer(id) : null;
 
     $('modal-title').textContent = c ? 'Edit Customer' : 'Add Customer';
     $('f-name').value = c ? c.name : '';
@@ -291,7 +361,7 @@ function saveCustomer() {
     var name = $('f-name').value.trim();
     var phone = $('f-phone').value.trim();
     if (!name || !phone) {
-        $('form-error').textContent = 'Naam aur phone zaroori hain.';
+        $('form-error').textContent = 'Name and phone number is compulsory.';
         return;
     }
 
@@ -310,16 +380,16 @@ function saveCustomer() {
     };
 
     if (editingId) {
-        var c = customers.find(function (x) { return x.id === editingId; });
+        var c = findCustomer(editingId);
         Object.assign(c, data);
-        toast('Customer update ho gaya');
+        toast('Customer is updated');
     } else {
         data.id = nextId++;
         data.active = true;
         data.ledger = [];
         data.invoices = [];
         customers.unshift(data);
-        toast('Naya customer add ho gaya');
+        toast('Newcustomer added');
     }
 
     closeModal();
@@ -338,18 +408,10 @@ $('cust-body').addEventListener('click', function (e) {
     if (!row) return;
     var id = parseInt(row.dataset.id, 10);
 
-    if (e.target.closest('a.act')) return; // WhatsApp / Call apna kaam karein
-
     var btn = e.target.closest('button.act');
     if (btn) {
-        var act = btn.dataset.act;
-        if (act === 'edit') openModal(id);
-        else if (act === 'toggle') {
-            var c = customers.find(function (x) { return x.id === id; });
-            c.active = !c.active;
-            toast(c.active ? 'Customer active ho gaya' : 'Customer inactive ho gaya');
-            renderAll();
-        } else placeholderAction(act);
+        if (menuId === id && menu.style.display === 'block') closeMenu();
+        else openMenu(btn, findCustomer(id));
         return;
     }
     openPanel(id);
@@ -382,7 +444,7 @@ document.querySelectorAll('.filter-btn').forEach(function (b) {
 });
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeModal(); closePanel(); }
+    if (e.key === 'Escape') { closeMenu(); closeModal(); closePanel(); }
 });
 
 renderAll();

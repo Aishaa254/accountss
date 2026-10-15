@@ -26,7 +26,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-main"><i class="fa-solid fa-cart-shopping"></i></div>
         <div>
-            <div class="vd-value" id="cdMonth">Rs 0</div>
+            <div class="vd-value" id="cdMonth">0</div>
             <div class="vd-label">Purchases This Month</div>
             <div class="vd-note" id="cdMonthNote"></div>
         </div>
@@ -35,7 +35,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-blue"><i class="fa-solid fa-wallet"></i></div>
         <div>
-            <div class="vd-value" id="cdPayable">Rs 0</div>
+            <div class="vd-value" id="cdPayable">0</div>
             <div class="vd-label">Total Payable</div>
             <div class="vd-note" id="cdPayableNote"></div>
         </div>
@@ -44,7 +44,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-orange"><i class="fa-regular fa-calendar-check"></i></div>
         <div>
-            <div class="vd-value" id="cdDue">Rs 0</div>
+            <div class="vd-value" id="cdDue">0</div>
             <div class="vd-label">Due in 7 Days</div>
             <div class="vd-note" id="cdDueNote"></div>
         </div>
@@ -53,7 +53,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
         <div>
-            <div class="vd-value vd-red" id="cdOverdue">Rs 0</div>
+            <div class="vd-value vd-red" id="cdOverdue">0</div>
             <div class="vd-label">Overdue</div>
             <div class="vd-note" id="cdOverdueNote"></div>
         </div>
@@ -159,7 +159,7 @@
             <small class="vd-err" data-err="pfItems"></small>
             <button type="button" class="vd-btn-ghost pu-add-item" id="pfAddItem"><i class="fa-solid fa-plus"></i> Add item</button>
 
-            <div class="pu-form-total"><span>Total</span><b id="pfTotal">Rs 0</b></div>
+            <div class="pu-form-total"><span>Total</span><b id="pfTotal">0</b></div>
 
             <div class="vd-field pu-notes">
                 <label>Notes</label>
@@ -186,7 +186,7 @@
             <div class="vd-pay-sum" id="ppSummary"></div>
 
             <div class="vd-field">
-                <label>Amount (Rs) <span class="vd-req">*</span></label>
+                <label>Amount (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
                 <div class="vd-inline">
                     <input type="number" class="vd-input" id="ppAmount" min="0" step="any" placeholder="0">
                     <button type="button" class="vd-btn-ghost vd-small" id="ppFull">Pay full</button>

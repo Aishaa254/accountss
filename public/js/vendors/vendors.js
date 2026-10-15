@@ -28,7 +28,7 @@
     function $(id) { return document.getElementById(id); }
 
     function money(n) {
-        return 'Rs ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        return formatMoney(n);
     }
 
     function esc(text) {

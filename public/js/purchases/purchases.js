@@ -13,7 +13,7 @@
     function round2(n) { return Math.round(n * 100) / 100; }
 
     function money(n) {
-        return 'Rs ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 });
+        return formatMoney(n);
     }
 
     function esc(text) {
@@ -399,7 +399,7 @@
             '<input type="text" class="vd-input pu-desc" placeholder="Item description" maxlength="80">' +
             '<input type="number" class="vd-input pu-qty" min="0" step="any" placeholder="Qty">' +
             '<input type="number" class="vd-input pu-price" min="0" step="any" placeholder="Price">' +
-            '<div class="pu-line-total">Rs 0</div>' +
+            '<div class="pu-line-total">' + money(0) + '</div>' +
             '<button type="button" class="pu-rm" title="Remove"><i class="fa-regular fa-trash-can"></i></button>';
 
         if (it) {

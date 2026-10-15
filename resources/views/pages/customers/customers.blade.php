@@ -98,8 +98,8 @@
             <div><label>WhatsApp</label><input type="text" id="f-whatsapp" placeholder="Same as phone if empty"></div>
             <div><label>Email</label><input type="text" id="f-email" placeholder="Email address"></div>
             <div><label>City</label><input type="text" id="f-city" placeholder="City"></div>
-            <div><label>Credit Limit (Rs)</label><input type="number" id="f-limit" placeholder="0"></div>
-            <div><label>Opening Balance (Rs)</label><input type="number" id="f-opening" placeholder="0"></div>
+            <div><label>Credit Limit (<span class="cur-sym">Rs</span>)</label><input type="number" id="f-limit" placeholder="0"></div>
+            <div><label>Opening Balance (<span class="cur-sym">Rs</span>)</label><input type="number" id="f-opening" placeholder="0"></div>
             <div>
                 <label>Opening Balance Type</label>
                 <select id="f-type">

@@ -25,4 +25,10 @@ Route::get('/purchases', function () {
 Route::get('/expenses',function(){
     return view('pages.expenses.expenses');
 });
+Route::get('/dashboard',function(){
+    return view('pages.dashboard.dashboard');
+});
+Route::get('/reports',function(){
+    return view('pages.reports.reports');
+});
 Route::post('/settings/company', [CompanySettingController::class, 'save'])->name('company.save');

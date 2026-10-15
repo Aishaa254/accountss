@@ -1,25 +1,26 @@
+var pending = {};
 var themes = {
     emerald: ['#0f766e', '#10b981'],
-    ocean:   ['#1d4ed8', '#3b82f6'],
-    purple:  ['#6d28d9', '#8b5cf6'],
-    sunset:  ['#c2410c', '#f97316'],
-    rose:    ['#be123c', '#f43f5e'],
-    sky:     ['#0e7490', '#06b6d4']
+    ocean: ['#1d4ed8', '#3b82f6'],
+    purple: ['#6d28d9', '#8b5cf6'],
+    sunset: ['#c2410c', '#f97316'],
+    rose: ['#be123c', '#f43f5e'],
+    sky: ['#0e7490', '#06b6d4']
 };
 
 var darkThemes = {
     emerald: ['#14b8a6', '#34d399'],
-    ocean:   ['#60a5fa', '#93c5fd'],
-    purple:  ['#a78bfa', '#c4b5fd'],
-    sunset:  ['#fb923c', '#fdba74'],
-    rose:    ['#fb7185', '#fda4af'],
-    sky:     ['#22d3ee', '#67e8f9']
+    ocean: ['#60a5fa', '#93c5fd'],
+    purple: ['#a78bfa', '#c4b5fd'],
+    sunset: ['#fb923c', '#fdba74'],
+    rose: ['#fb7185', '#fda4af'],
+    sky: ['#22d3ee', '#67e8f9']
 };
 
 var fonts = {
-    segoe:     '"Segoe UI", Arial, sans-serif',
-    poppins:   '"Poppins", sans-serif',
-    roboto:    '"Roboto", sans-serif',
+    segoe: '"Segoe UI", Arial, sans-serif',
+    poppins: '"Poppins", sans-serif',
+    roboto: '"Roboto", sans-serif',
     notoserif: '"Noto Serif", serif'
 };
 
@@ -94,11 +95,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         setCustomTheme(value);
-        localStorage.setItem('customColor', value);
-        localStorage.setItem('theme', 'custom');
+        pending.customColor = value;
+        pending.theme = 'custom';
         applyTheme('custom');
         input.value = value;
-        if (msg) { msg.textContent = 'Color is applied'; msg.className = 'color-msg ok'; }
+        if (msg) { msg.textContent = 'Preview on. Click Save Changes to keep it'; msg.className = 'color-msg ok'; }
     });
 });
 // Sidebar logo: logo ho to "A" icon ki jagah dikhao
@@ -120,3 +121,40 @@ function applySidebarLogo() {
 }
 
 document.addEventListener('DOMContentLoaded', applySidebarLogo);
+// Title: browser tab aur sidebar ka naam
+function applyTitle() {
+    var t = localStorage.getItem('appTitle');
+    if (!t) { return; }
+
+    var parts = document.title.split(' - ');
+    document.title = parts[0] + ' - ' + t;
+
+    var h = document.getElementById('sidebarTitle');
+    if (h) { h.textContent = t; }
+}
+
+document.addEventListener('DOMContentLoaded', applyTitle);
+// Currency: poori site ke liye ek common function
+var currencySymbols = { PKR: 'Rs', USD: '$', AED: 'AED', SAR: 'SAR', EUR: '€' };
+
+function formatMoney(amount) {
+    var code = localStorage.getItem('currency') || 'PKR';
+    var pos = localStorage.getItem('symbolPosition') || 'before';
+    var sym = currencySymbols[code] || code;
+    var amt = Number(amount).toLocaleString('en-US');
+    return pos === 'before' ? sym + ' ' + amt : amt + ' ' + sym;
+}
+
+function applyCurrency() {
+    var code = localStorage.getItem('currency') || 'PKR';
+    var sym = currencySymbols[code] || code;
+
+    document.querySelectorAll('.money').forEach(function (el) {
+        el.textContent = formatMoney(el.dataset.amount);
+    });
+    document.querySelectorAll('.cur-sym').forEach(function (el) {
+        el.textContent = sym;
+    });
+}
+
+document.addEventListener('DOMContentLoaded', applyCurrency);

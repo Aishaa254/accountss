@@ -4,7 +4,7 @@
     function toStr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     function today() { return toStr(new Date()); }
     function ago(n) { var d = new Date(); d.setDate(d.getDate() - n); return toStr(d); }
-    function money(n) { return 'Rs ' + Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
+    function money(n) { return formatMoney(n); }
 
     function fmt(s) {
         var p = s.split('-');

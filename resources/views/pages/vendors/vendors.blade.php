@@ -36,7 +36,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-blue"><i class="fa-solid fa-wallet"></i></div>
         <div>
-            <div class="vd-value" id="cardPayable">Rs 0</div>
+            <div class="vd-value" id="cardPayable">0</div>
             <div class="vd-label">Total Payable</div>
             <div class="vd-note" id="cardPayableNote"></div>
         </div>
@@ -45,7 +45,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-orange"><i class="fa-regular fa-calendar-check"></i></div>
         <div>
-            <div class="vd-value" id="cardDue">Rs 0</div>
+            <div class="vd-value" id="cardDue">0</div>
             <div class="vd-label">Due in 7 Days</div>
             <div class="vd-note" id="cardDueNote"></div>
         </div>
@@ -54,7 +54,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-red"><i class="fa-solid fa-triangle-exclamation"></i></div>
         <div>
-            <div class="vd-value vd-red" id="cardOverdue">Rs 0</div>
+            <div class="vd-value vd-red" id="cardOverdue">0</div>
             <div class="vd-label">Overdue Payable</div>
             <div class="vd-note" id="cardOverdueNote"></div>
         </div>
@@ -185,7 +185,7 @@
                 </div>
 
                 <div class="vd-field">
-                    <label>Opening Balance (Rs)</label>
+                    <label>Opening Balance (<span class="cur-sym">Rs</span>)</label>
                     <input type="number" class="vd-input" id="fBalance" min="0" step="any" placeholder="0">
                     <small class="vd-hint" id="fBalanceHint"></small>
                     <small class="vd-err" data-err="fBalance"></small>
@@ -236,7 +236,7 @@
             <div class="vd-pay-sum" id="pSummary"></div>
 
             <div class="vd-field">
-                <label>Amount (Rs) <span class="vd-req">*</span></label>
+                <label>Amount (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
                 <div class="vd-inline">
                     <input type="number" class="vd-input" id="pAmount" min="0" step="any" placeholder="0">
                     <button type="button" class="vd-btn-ghost vd-small" id="pFull">Pay full</button>

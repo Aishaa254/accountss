@@ -3,7 +3,7 @@
     <div class="logo">
         <img id="sidebarLogo" class="logo-img" alt="Logo" style="display:none">
         <span class="logo-icon" id="sidebarIcon">A</span>
-        <h2>AccountPro</h2>
+        <h2 id="sidebarTitle">AccountPro</h2>
     </div>
 
     <p class="menu-title">Overview</p>
@@ -30,7 +30,7 @@
     <a href="/expenses" class="menu-link {{ request()->is('expenses') ? 'active' : '' }}">
         <i class="fa-solid fa-wallet"></i> Expenses
     </a>
-    <a href="#" class="menu-link">
+    <a href="/reports" class="menu-link {{ request()->is('reports') ? 'active' : '' }}">
         <i class="fa-solid fa-chart-pie"></i> Reports
     </a>
 

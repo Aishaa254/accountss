@@ -10,8 +10,7 @@ function esc(text) {
         return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
 }
-
-function money(n) { return 'Rs ' + Math.round(n).toLocaleString('en-US'); }
+function money(n) { return formatMoney(Math.round(n)); }
 
 function iso(offset) {
     var d = new Date();
@@ -32,7 +31,7 @@ function toast(msg) {
     setTimeout(function () { t.classList.remove('show'); }, 2400);
 }
 
-// ---------- Namoone ka data (tareekhein aaj ke hisaab se khud banti hain) ----------
+// ---------- customers ka data (tareekhein aaj ke hisaab se khud banti hain) ----------
 var invoices = [
     { no: 'INV-0001', customer: 'Ali Traders', date: iso(-50), due: iso(-35), items: [{ name: 'Cotton fabric (meter)', qty: 100, price: 600 }], discount: 0, tax: 0, paid: 20000 },
     { no: 'INV-0002', customer: 'Sara Fabrics', date: iso(-30), due: iso(-15), items: [{ name: 'Lawn suits', qty: 40, price: 500 }], discount: 0, tax: 0, paid: 20000 },
@@ -292,13 +291,13 @@ function openNew() {
 function saveNew() {
     var d = draft();
     var items = validItems();
-    if (!$('n-customer').value) { $('new-error').textContent = 'Customer chuno.'; return; }
-    if (!items.length) { $('new-error').textContent = 'Kam az kam ek item likho (naam, miqdar, qeemat).'; return; }
+    if (!$('n-customer').value) { $('new-error').textContent = 'Select Customer.'; return; }
+    if (!items.length) { $('new-error').textContent = 'Choose Atlleast One Item (name, quantity,price).'; return; }
     d.items = items;
     invoices.unshift(d);
     $('new-modal').classList.remove('show');
     renderAll();
-    toast(d.no + ' ban gaya');
+    toast(d.no + ' done');
 }
 
 // ---------- Buttons aur clicks ----------

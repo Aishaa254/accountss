@@ -85,7 +85,7 @@
                     <div id="items"></div>
                     <button type="button" class="add-item" id="add-item">+ Add item</button>
                     <div class="form-grid">
-                        <div><label>Discount (Rs)</label><input type="number" id="n-discount" value="0"></div>
+                    <div><label>Discount (<span class="cur-sym">Rs</span>)</label><input type="number" id="n-discount" value="0"></div>
                         <div><label>Tax (%)</label><input type="number" id="n-tax" value="0"></div>
                     </div>
                 </div>
@@ -124,7 +124,7 @@
             </div>
             <p class="sum-label" id="pay-info" style="margin-bottom:12px;"></p>
             <div class="form-grid" style="grid-template-columns:1fr;">
-                <div><label>Amount received (Rs)</label><input type="number" id="pay-amount"></div>
+            <div><label>Amount received (<span class="cur-sym">Rs</span>)</label><input type="number" id="pay-amount"></div>
             </div>
             <p class="form-error" id="pay-error"></p>
             <div class="modal-foot">

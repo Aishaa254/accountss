@@ -21,10 +21,7 @@
         <a href="#" class="settings-link active" data-section="section-brand"><i class="fa-solid fa-palette"></i> Brand Settings</a>
         <a href="#" class="settings-link" data-section="section-system"><i class="fa-solid fa-gear"></i> System Settings</a>
         <a href="#" class="settings-link" data-section="section-company"><i class="fa-solid fa-building"></i> Company Settings</a>
-        <a href="#" class="settings-link" data-section="section-currency"><i class="fa-solid fa-dollar-sign"></i> Currency Settings</a>
-
         <p class="settings-group">Integrations &amp; Contact</p>
-        <a href="#" class="settings-link" data-section="section-email"><i class="fa-solid fa-envelope"></i> Email Settings</a>
         <a href="#" class="settings-link" data-section="section-contact"><i class="fa-solid fa-phone"></i> Contact Settings</a>
     </div>
 
@@ -38,7 +35,7 @@
                         <h3 class="settings-heading"><i class="fa-solid fa-palette"></i> Brand Settings</h3>
                         <p class="settings-small">Customize your application's branding and appearance</p>
                     </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
+                    <button class="save-btn" id="brandSave"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                 </div>
 
                 <div class="tabs">
@@ -61,14 +58,13 @@
 
                 <div class="tab-panel" id="tab-text">
                     <label class="label">Title Text</label>
-                    <input type="text" class="text-input" value="AccountGo">
+                    <input type="text" class="text-input" id="titleText" value="AccountPro">
                     <p class="hint">Application title displayed in the browser tab</p>
 
                     <label class="label">Footer Text</label>
-                    <input type="text" class="text-input" value="Copyright © AccountGo">
+                    <input type="text" class="text-input" id="footerText" value="Copyright © AccountPro">
                     <p class="hint">Text displayed in the footer</p>
                 </div>
-
                 <div class="tab-panel" id="tab-theme">
                     <div class="theme-top">
                         <h4 class="sub-heading">Theme Color</h4>
@@ -141,17 +137,10 @@
                         <h3 class="settings-heading"><i class="fa-solid fa-gear"></i> System Settings</h3>
                         <p class="settings-small">Configure system-wide settings for your application</p>
                     </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
+                    <button class="save-btn" id="systemSave"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                 </div>
                 <div class="two-cols">
-                    <div>
-                        <label class="label">Default Language</label>
-                        <select class="text-input">
-                            <option>English</option>
-                            <option>Urdu</option>
-                            <option>Arabic</option>
-                        </select>
-                    </div>
+
                     <div>
                         <label class="label">Time Zone</label>
                         <select class="text-input">
@@ -173,6 +162,23 @@
                         <select class="text-input" id="timeFormat" name="time_format">
                             <option>12 Hour (02:30 PM)</option>
                             <option>24 Hour (14:30)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Currency</label>
+                        <select class="text-input" id="currency" name="currency">
+                            <option value="PKR">PKR - Pakistani Rupee</option>
+                            <option value="USD">USD - US Dollar</option>
+                            <option value="AED">AED - UAE Dirham</option>
+                            <option value="SAR">SAR - Saudi Riyal</option>
+                            <option value="EUR">EUR - Euro</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="label">Symbol Position</label>
+                        <select class="text-input" id="symbolPosition" name="symbol_position">
+                            <option value="before">Before amount (Rs 100)</option>
+                            <option value="after">After amount (100 Rs)</option>
                         </select>
                     </div>
                 </div>
@@ -229,70 +235,6 @@
                 </form>
             </div>
         </div>
-
-        <!-- ========== CURRENCY SETTINGS ========== -->
-        <div class="section" id="section-currency">
-            <div class="settings-card">
-                <div class="settings-top">
-                    <div>
-                        <h3 class="settings-heading"><i class="fa-solid fa-dollar-sign"></i> Currency Settings</h3>
-                        <p class="settings-small">Choose how money is shown</p>
-                    </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
-                </div>
-                <div class="two-cols">
-                    <div>
-                        <label class="label">Currency</label>
-                        <select class="text-input">
-                            <option>PKR - Pakistani Rupee</option>
-                            <option>USD - US Dollar</option>
-                            <option>AED - UAE Dirham</option>
-                            <option>SAR - Saudi Riyal</option>
-                            <option>EUR - Euro</option>
-                        </select>
-                    </div>
-                    <div>
-                        <label class="label">Symbol Position</label>
-                        <select class="text-input">
-                            <option>Before amount (Rs 100)</option>
-                            <option>After amount (100 Rs)</option>
-                        </select>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- ========== EMAIL SETTINGS ========== -->
-        <div class="section" id="section-email">
-            <div class="settings-card">
-                <div class="settings-top">
-                    <div>
-                        <h3 class="settings-heading"><i class="fa-solid fa-envelope"></i> Email Settings</h3>
-                        <p class="settings-small">Emails sent to your clients come from here</p>
-                    </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
-                </div>
-                <div class="two-cols">
-                    <div>
-                        <label class="label">Sender Name</label>
-                        <input type="text" class="text-input" placeholder="Sender name">
-                    </div>
-                    <div>
-                        <label class="label">Sender Email</label>
-                        <input type="text" class="text-input" placeholder="Sender email address">
-                    </div>
-                    <div>
-                        <label class="label">Mail Server</label>
-                        <input type="text" class="text-input" placeholder="smtp.example.com">
-                    </div>
-                    <div>
-                        <label class="label">Port</label>
-                        <input type="text" class="text-input" placeholder="587">
-                    </div>
-                </div>
-            </div>
-        </div>
-
         <!-- ========== CONTACT SETTINGS ========== -->
         <div class="section" id="section-contact">
             <div class="settings-card">

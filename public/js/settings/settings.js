@@ -43,14 +43,14 @@ colorBoxes.forEach(function (box) {
     box.addEventListener('click', function () {
         var name = box.dataset.theme;
         applyTheme(name);
-        localStorage.setItem('theme', name);
+        pending.theme = name;
         markColor(name);
     });
 });
 
 document.getElementById('reset-theme').addEventListener('click', function () {
     applyTheme('emerald');
-    localStorage.removeItem('theme');
+    pending.theme = 'emerald';
     markColor('emerald');
 });
 
@@ -69,7 +69,7 @@ modeButtons.forEach(function (button) {
     button.addEventListener('click', function () {
         var mode = button.dataset.mode;
         applyMode(mode);
-        localStorage.setItem('mode', mode);
+        pending.mode = mode;
         markMode(mode);
     });
 });
@@ -89,9 +89,42 @@ fontButtons.forEach(function (button) {
     button.addEventListener('click', function () {
         var name = button.dataset.font;
         applyFont(name);
-        localStorage.setItem('font', name);
+        pending.font = name;
         markFont(name);
     });
+});
+
+// Title input mein saved naam dikhao
+var titleInput = document.getElementById('titleText');
+if (titleInput) {
+    titleInput.value = localStorage.getItem('appTitle') || 'AccountPro';
+}
+
+// Brand: Save Changes dabane par hi save
+document.getElementById('brandSave').addEventListener('click', function () {
+    if (pending.theme) {
+        localStorage.setItem('theme', pending.theme);
+    }
+    if (pending.theme === 'custom' && pending.customColor) {
+        localStorage.setItem('customColor', pending.customColor);
+    }
+    if (pending.mode) {
+        localStorage.setItem('mode', pending.mode);
+    }
+    if (pending.font) {
+        localStorage.setItem('font', pending.font);
+    }
+
+    if (titleInput) {
+        var newTitle = titleInput.value.trim();
+        if (newTitle) {
+            localStorage.setItem('appTitle', newTitle);
+            applyTitle();
+        }
+    }
+
+    pending = {};
+    alert('Brand settings saved');
 });
 
 // ===== Logo (Light / Dark preview) =====
@@ -105,7 +138,7 @@ fontButtons.forEach(function (button) {
 
     var imgs = document.querySelectorAll('#tab-logo .lg-img');
     var empties = document.querySelectorAll('#tab-logo .lg-empty');
-    var pending = null;
+    var pendingLogo = null;
 
     function show(text, type) {
         msg.textContent = text;
@@ -127,14 +160,12 @@ fontButtons.forEach(function (button) {
         });
     }
 
-    // Sidebar ka logo theme.js wala function lagata hai
     function updateSidebar() {
         if (typeof applySidebarLogo === 'function') {
             applySidebarLogo();
         }
     }
 
-    // Page khulte hi saved logo dikhao
     showPreview(localStorage.getItem('brandLogo'));
     updateSidebar();
 
@@ -146,7 +177,6 @@ fontButtons.forEach(function (button) {
         var f = file.files[0];
         if (!f) { return; }
 
-        // SVG already halki hoti hai, usay waise hi rakho
         if (f.type === 'image/svg+xml') {
             if (f.size > 200 * 1024) {
                 show('SVG file is too big', 'error');
@@ -155,15 +185,14 @@ fontButtons.forEach(function (button) {
             }
             var svgReader = new FileReader();
             svgReader.onload = function () {
-                pending = svgReader.result;
-                showPreview(pending);
+                pendingLogo = svgReader.result;
+                showPreview(pendingLogo);
                 show('Looks good? Click Save Logo', 'ok');
             };
             svgReader.readAsDataURL(f);
             return;
         }
 
-        // PNG / JPG: badi ho to khud chhoti kar do
         if (f.size > 10 * 1024 * 1024) {
             show('Image is too big (maximum 10 MB)', 'error');
             file.value = '';
@@ -181,8 +210,8 @@ fontButtons.forEach(function (button) {
                 canvas.height = Math.round(img.height * scale);
                 canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
 
-                pending = canvas.toDataURL('image/png');
-                showPreview(pending);
+                pendingLogo = canvas.toDataURL('image/png');
+                showPreview(pendingLogo);
                 show('Looks good? Click Save Logo', 'ok');
             };
             img.onerror = function () {
@@ -194,17 +223,17 @@ fontButtons.forEach(function (button) {
     });
 
     saveBtn.addEventListener('click', function () {
-        if (!pending) {
+        if (!pendingLogo) {
             show('Choose an image first', 'error');
             return;
         }
         try {
-            localStorage.setItem('brandLogo', pending);
+            localStorage.setItem('brandLogo', pendingLogo);
         } catch (e) {
             show('Could not save, try a smaller image', 'error');
             return;
         }
-        pending = null;
+        pendingLogo = null;
         file.value = '';
         updateSidebar();
         show('Logo saved', 'ok');
@@ -212,10 +241,22 @@ fontButtons.forEach(function (button) {
 
     removeBtn.addEventListener('click', function () {
         localStorage.removeItem('brandLogo');
-        pending = null;
+        pendingLogo = null;
         file.value = '';
         showPreview(null);
         updateSidebar();
         show('Logo removed', 'ok');
     });
 })();
+// System: currency save
+var currencySelect = document.getElementById('currency');
+var positionSelect = document.getElementById('symbolPosition');
+currencySelect.value = localStorage.getItem('currency') || 'PKR';
+positionSelect.value = localStorage.getItem('symbolPosition') || 'before';
+
+document.getElementById('systemSave').addEventListener('click', function () {
+    localStorage.setItem('currency', currencySelect.value);
+    localStorage.setItem('symbolPosition', positionSelect.value);
+    applyCurrency();
+    alert('System settings saved');
+});

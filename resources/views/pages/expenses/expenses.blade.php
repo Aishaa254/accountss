@@ -25,7 +25,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-main"><i class="fa-solid fa-receipt"></i></div>
         <div>
-            <div class="vd-value" id="cdMonth">Rs 0</div>
+            <div class="vd-value" id="cdMonth">0</div>
             <div class="vd-label">This Month</div>
             <div class="vd-note" id="cdMonthNote"></div>
         </div>
@@ -34,7 +34,7 @@
     <div class="vd-card">
         <div class="vd-icon vd-icon-blue"><i class="fa-solid fa-calendar-days"></i></div>
         <div>
-            <div class="vd-value" id="cdLast">Rs 0</div>
+            <div class="vd-value" id="cdLast">0</div>
             <div class="vd-label">Last Month</div>
             <div class="vd-note" id="cdLastNote"></div>
         </div>
@@ -106,7 +106,7 @@
                 </div>
 
                 <div class="vd-field">
-                    <label>Amount (Rs) <span class="vd-req">*</span></label>
+                    <label>Amount (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
                     <input type="number" class="vd-input" id="efAmount" min="0" step="any" placeholder="0">
                     <small class="vd-err" data-err="efAmount"></small>
                 </div>
