@@ -500,3 +500,7 @@ select.is-invalid {
         flex-wrap: wrap;
     }
 }
+.settings-top > div:first-child {
+    flex: 1;
+    min-width: 200px;
+}

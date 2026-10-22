@@ -3,7 +3,6 @@
     function pad(n) { return n < 10 ? '0' + n : String(n); }
     function toStr(d) { return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); }
     function today() { return toStr(new Date()); }
-    function ago(n) { var d = new Date(); d.setDate(d.getDate() - n); return toStr(d); }
     function money(n) { return formatMoney(n); }
 
     function fmt(s) {
@@ -15,21 +14,35 @@
         return String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    // Sample data (backend ke baad asli data aayega)
+    // ---------- Laravel se baat karne wala helper ----------
+    function api(method, url, body) {
+        return fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) { throw new Error(data.message || 'request failed'); }
+                return data;
+            });
+        });
+    }
+
     var categories = ['Rent', 'Utilities', 'Salaries', 'Transport', 'Supplies', 'Other'];
 
-    var expenses = [
-        { id: 1,  title: 'Shop rent',          amount: 60000, date: ago(10), category: 'Rent',      method: 'Bank Transfer', note: '' },
-        { id: 2,  title: 'Electricity bill',   amount: 18500, date: ago(8),  category: 'Utilities', method: 'Online',        note: 'September units' },
-        { id: 3,  title: 'Staff salaries',     amount: 85000, date: ago(5),  category: 'Salaries',  method: 'Bank Transfer', note: '' },
-        { id: 4,  title: 'Delivery van fuel',  amount: 7200,  date: ago(3),  category: 'Transport', method: 'Cash',          note: '' },
-        { id: 5,  title: 'Office stationery',  amount: 3400,  date: ago(1),  category: 'Supplies',  method: 'Cash',          note: '' },
-        { id: 6,  title: 'Shop rent',          amount: 60000, date: ago(40), category: 'Rent',      method: 'Bank Transfer', note: '' },
-        { id: 7,  title: 'Internet and phone', amount: 5500,  date: ago(36), category: 'Utilities', method: 'Online',        note: '' },
-        { id: 8,  title: 'Staff salaries',     amount: 85000, date: ago(35), category: 'Salaries',  method: 'Bank Transfer', note: '' },
-        { id: 9,  title: 'Truck repair',       amount: 22000, date: ago(30), category: 'Transport', method: 'Cash',          note: 'Brake pads' },
-        { id: 10, title: 'Cleaning supplies',  amount: 2800,  date: ago(28), category: 'Supplies',  method: 'Cash',          note: '' }
-    ];
+    // ---------- Data (ab database se aata hai) ----------
+    var expenses = [];
+
+    function loadExpenses() {
+        return api('GET', '/expenses/list').then(function (data) {
+            expenses = data;
+            render();
+        });
+    }
 
     var state = { search: '', cat: 'all' };
     var editingId = null;
@@ -181,17 +194,17 @@
             note: $('efNote').value.trim()
         };
 
-        if (editingId) {
-            Object.assign(find(editingId), data);
-            toast('Expense updated');
-        } else {
-            data.id = expenses.reduce(function (m, x) { return Math.max(m, x.id); }, 0) + 1;
-            expenses.push(data);
-            toast('Expense added');
-        }
+        var request = editingId
+            ? api('PUT', '/expenses/' + editingId, data)
+            : api('POST', '/expenses', data);
 
-        closeModal('exModal');
-        render();
+        request
+            .then(function () {
+                toast(editingId ? 'Expense updated' : 'Expense added');
+                closeModal('exModal');
+                loadExpenses();
+            })
+            .catch(function (e) { toast(e.message || 'Could not save expense', 'err'); });
     });
 
     // Edit / Delete buttons
@@ -214,15 +227,20 @@
     $('ecOk').addEventListener('click', function () {
         var item = find(deleteId);
         if (!item) { return; }
-        expenses.splice(expenses.indexOf(item), 1);
-        closeModal('exConfirm');
-        render();
-        toast('Expense deleted');
+
+        api('DELETE', '/expenses/' + item.id)
+            .then(function () {
+                closeModal('exConfirm');
+                toast('Expense deleted');
+                loadExpenses();
+            })
+            .catch(function (e) { toast(e.message || 'Could not delete expense', 'err'); });
     });
 
     // Search aur filter
     $('exSearch').addEventListener('input', function () { state.search = this.value; render(); });
     $('exCat').addEventListener('change', function () { state.cat = this.value; render(); });
 
-    render();
+    // Page khulte hi data mangwana
+    loadExpenses();
 })();

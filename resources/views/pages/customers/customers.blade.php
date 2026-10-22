@@ -72,8 +72,8 @@
 
         <div class="cust-empty" id="cust-empty" style="display:none;">
             <i class="fa-solid fa-user-plus"></i>
-            <p>Koi customer nahi mila.</p>
-            <button class="btn-main" id="empty-add">Pehla customer add karo</button>
+            <p>No Customer Found</p>
+            <button class="btn-main" id="empty-add">Add your first customer</button>
         </div>
     </div>
 

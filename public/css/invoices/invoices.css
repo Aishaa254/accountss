@@ -1,13 +1,29 @@
-.inv .cust-cards { grid-template-columns: repeat(2, 1fr); }
+.inv .cust-cards { grid-template-columns: repeat(4, 1fr); }
+.inv .sum-icon.c-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6; }
+.inv .sum-icon.c-red { background: rgba(239, 68, 68, 0.15); color: #ef4444; }
+.inv .sum-value.t-red { color: #ef4444; }
+
+@media (max-width: 1100px) { .inv .cust-cards { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .inv .cust-cards { grid-template-columns: 1fr; } }
 .inv .modal-box.wide { width: 1120px; }
 .inv .modal-box.mid { width: 780px; }
 .inv .modal-box.small { width: 400px; }
 #pay-modal { z-index: 70; }
+#del-modal { z-index: 70; }
 
 .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 .sec-label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
 
 .item-row { display: grid; grid-template-columns: 1fr 70px 110px 34px; gap: 8px; margin-bottom: 8px; }
+.item-head {
+    display: grid;
+    grid-template-columns: 1fr 70px 110px 34px;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--muted);
+}
 .item-row input {
     width: 100%; padding: 10px; border: 1px solid var(--border); border-radius: 10px;
     background: var(--bg); color: var(--text); font-size: 14px; outline: none;
@@ -25,6 +41,53 @@
 .due-tag { font-size: 11px; font-weight: 600; margin-top: 2px; }
 .paid-text { font-size: 11px; color: var(--muted); margin-top: 4px; }
 .inv .limit-bar { width: 110px; }
+
+/* Zaroori star, galat field aur error message */
+.req { color: #e11d48; font-weight: 700; }
+
+.is-invalid {
+    border-color: #e11d48 !important;
+    box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15) !important;
+}
+
+.field-err { display: block; margin-top: 4px; font-size: 12px; color: #e11d48; }
+.field-err:empty { display: none; }
+
+.toast.error { background: #dc2626 !important; }
+
+/* Teen nuqton ka dropdown (body mein lagta hai, isliye .inv ke bahar) */
+.inv-menu {
+    position: fixed;
+    z-index: 1000;
+    min-width: 200px;
+    padding: 6px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+.inv-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    width: 100%;
+    padding: 10px 12px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--text);
+    font-size: 14px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+}
+.inv-menu-item i { width: 16px; text-align: center; color: var(--muted); }
+.inv-menu-item:hover { background: var(--hover); }
+.inv-menu-item.danger,
+.inv-menu-item.danger i { color: #ef4444; }
+
+.inv-menu-sep { height: 1px; margin: 6px 4px; background: var(--border); }
 
 /* Invoice (hamesha safed, dark mode mein bhi, taake PDF sahi bane) */
 .bill { background: #fff; color: #1e293b; padding: 26px; font-size: 13px; line-height: 1.5; border-radius: 6px; }

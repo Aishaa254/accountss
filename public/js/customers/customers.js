@@ -1,39 +1,4 @@
-// ---------- Namoone ka data (baad mein database se aayega) ----------
-var customers = [
-    { id: 1, name: 'Ali Traders', phone: '0300 1234567', whatsapp: '0300 1234567', email: 'ali@example.com', city: 'Gujranwala', address: 'Main Bazaar, Gujranwala', opening: 0, limit: 100000, notes: 'Pays at the end of the month', active: true,
-      ledger: [
-        { date: '2026-08-10', desc: 'Invoice INV-0001', debit: 60000, credit: 0 },
-        { date: '2026-08-25', desc: 'Payment received', debit: 0, credit: 20000 },
-        { date: '2026-09-20', desc: 'Invoice INV-0004', debit: 35000, credit: 0 }
-      ],
-      invoices: [
-        { no: 'INV-0001', date: '2026-08-10', amount: 60000, status: 'Partial' },
-        { no: 'INV-0004', date: '2026-09-20', amount: 35000, status: 'Unpaid' }
-      ] },
-    { id: 2, name: 'Sara Fabrics', phone: '0321 7654321', whatsapp: '', email: '', city: 'Lahore', address: 'Liberty Market, Lahore', opening: 15000, limit: 50000, notes: '', active: true,
-      ledger: [
-        { date: '2026-09-01', desc: 'Invoice INV-0002', debit: 20000, credit: 0 },
-        { date: '2026-09-15', desc: 'Payment received', debit: 0, credit: 20000 }
-      ],
-      invoices: [ { no: 'INV-0002', date: '2026-09-01', amount: 20000, status: 'Paid' } ] },
-    { id: 3, name: 'Hamid & Sons', phone: '0333 9876543', whatsapp: '', email: '', city: 'Sialkot', address: 'Paris Road, Sialkot', opening: 0, limit: 80000, notes: 'Always asks for more time', active: true,
-      ledger: [
-        { date: '2026-08-05', desc: 'Invoice INV-0003', debit: 95000, credit: 0 },
-        { date: '2026-09-02', desc: 'Payment received', debit: 0, credit: 5000 }
-      ],
-      invoices: [ { no: 'INV-0003', date: '2026-08-05', amount: 95000, status: 'Partial' } ] },
-    { id: 4, name: 'Noor Stores', phone: '0345 1112223', whatsapp: '', email: '', city: 'Gujrat', address: 'GT Road, Gujrat', opening: -12000, limit: 30000, notes: 'Advance given to us', active: true,
-      ledger: [ { date: '2026-09-10', desc: 'Credit note (goods returned)', debit: 0, credit: 3000 } ],
-      invoices: [] },
-    { id: 5, name: 'Bilal Electronics', phone: '0312 4445556', whatsapp: '', email: '', city: 'Faisalabad', address: 'Clock Tower, Faisalabad', opening: 0, limit: 40000, notes: '', active: true,
-      ledger: [
-        { date: '2026-09-05', desc: 'Invoice INV-0005', debit: 25000, credit: 0 },
-        { date: '2026-09-12', desc: 'Payment received', debit: 0, credit: 25000 }
-      ],
-      invoices: [ { no: 'INV-0005', date: '2026-09-05', amount: 25000, status: 'Paid' } ] },
-    { id: 6, name: 'Zainab Boutique', phone: '0306 7778889', whatsapp: '', email: '', city: 'Islamabad', address: 'F-7 Markaz, Islamabad', opening: 8000, limit: 20000, notes: 'Shop closed', active: false,
-      ledger: [], invoices: [] }
-];
+var customers = [];
 
 var nextId = 7;
 var currentFilter = 'all';
@@ -227,10 +192,26 @@ menu.addEventListener('click', function (e) {
 
     if (action === 'edit') openModal(c.id);
     else if (action === 'toggle') {
-        c.active = !c.active;
-        toast(c.active ? 'Customer is activated' : 'Customer is inactivated');
-        renderAll();
-    } else placeholderAction(action);
+        var newState = !c.active;
+        fetch('/customers/' + c.id, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify({ active: newState })
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('failed');
+            toast(newState ? 'Customer is activated' : 'Customer is inactivated');
+            loadCustomers();
+        })
+        .catch(function () {
+            toast('Could not change status');
+        });
+    }
+     else placeholderAction(action);
 });
 
 document.addEventListener('click', function (e) {
@@ -354,7 +335,6 @@ function openModal(id) {
     $('modal').classList.add('show');
     $('f-name').focus();
 }
-
 function closeModal() { $('modal').classList.remove('show'); }
 
 function saveCustomer() {
@@ -380,20 +360,50 @@ function saveCustomer() {
     };
 
     if (editingId) {
-        var c = findCustomer(editingId);
-        Object.assign(c, data);
-        toast('Customer is updated');
+        fetch('/customers/' + editingId, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify(data)
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('update failed');
+            return res.json();
+        })
+        .then(function () {
+            toast('Customer is updated');
+            closeModal();
+            loadCustomers();
+        })
+        .catch(function () {
+            $('form-error').textContent = 'Could not update. Please check the details.';
+        });
     } else {
-        data.id = nextId++;
-        data.active = true;
-        data.ledger = [];
-        data.invoices = [];
-        customers.unshift(data);
-        toast('Newcustomer added');
+        fetch('/customers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: JSON.stringify(data)
+        })
+        .then(function (res) {
+            if (!res.ok) throw new Error('save failed');
+            return res.json();
+        })
+        .then(function () {
+            toast('New customer added');
+            closeModal();
+            loadCustomers();
+        })
+        .catch(function () {
+            $('form-error').textContent = 'Could not save. Please check the details.';
+        });
     }
-
-    closeModal();
-    renderAll();
 }
 
 // ---------- Buttons aur clicks ----------
@@ -447,4 +457,13 @@ document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') { closeMenu(); closeModal(); closePanel(); }
 });
 
-renderAll();
+function loadCustomers() {
+    fetch('/customers/list')
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+            customers = data;
+            renderAll();
+        });
+}
+
+loadCustomers();

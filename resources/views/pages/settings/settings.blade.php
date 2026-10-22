@@ -14,7 +14,11 @@
 <h1 class="settings-title">Settings</h1>
 <p class="settings-text">Manage your system settings.</p>
 
-<div class="settings-page">
+@if(session('success'))
+<div class="alert alert-success">{{ session('success') }}</div>
+@endif
+
+<div class="settings-page" data-open="{{ session('open') }}">
 
     <div class="settings-menu">
         <p class="settings-group">Core Configuration</p>
@@ -135,7 +139,7 @@
                 <div class="settings-top">
                     <div>
                         <h3 class="settings-heading"><i class="fa-solid fa-gear"></i> System Settings</h3>
-                        <p class="settings-small">Configure system-wide settings for your application</p>
+                        <p class="settings-small">Configure system-wide settings. Date and time formats apply wherever they are shown in the system.</p>
                     </div>
                     <button class="save-btn" id="systemSave"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                 </div>
@@ -188,7 +192,7 @@
         <!-- ========== COMPANY SETTINGS ========== -->
         <div class="section" id="section-company">
             <div class="settings-card">
-                <form method="POST" action="{{ route('company.save') }}">
+                <form method="POST" action="{{ route('company.save') }}" id="companyForm" class="validate-form" novalidate>
                     @csrf
                     <div class="settings-top">
                         <div>
@@ -197,72 +201,119 @@
                         </div>
                         <button type="submit" class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                     </div>
+
                     <div class="two-cols">
-                        <div>
-                            <label class="label">Company Name</label>
-                            <input type="text" class="text-input" id="companyName" name="company_name" placeholder="Your company name" value="{{ $company->company_name ?? '' }}">
+                        <div class="field">
+                            <label class="label" for="companyName">Company Name <span class="required-star">*</span></label>
+                            <input type="text" class="text-input @error('company_name') is-invalid @enderror" id="companyName" name="company_name"
+                                placeholder="Your company name" maxlength="100" data-rule="name" data-label="Company name" data-required="1"
+                                value="{{ old('company_name', $company->company_name ?? '') }}">
+                            @error('company_name')<small class="field-error">{{ $message }}</small>@enderror
                         </div>
-                        <div>
-                            <label class="label">Registration Number</label>
-                            <input type="text" class="text-input" id="companyReg" name="registration_number" placeholder="Registration number" value="{{ $company->registration_number ?? '' }}">
+
+                        <div class="field">
+                            <label class="label" for="companyReg">Registration Number</label>
+                            <input type="text" class="text-input @error('registration_number') is-invalid @enderror" id="companyReg" name="registration_number"
+                                placeholder="e.g. 1234567-8" maxlength="30" data-rule="reg" data-label="Registration number"
+                                value="{{ old('registration_number', $company->registration_number ?? '') }}">
+                            @error('registration_number')<small class="field-error">{{ $message }}</small>@enderror
                         </div>
-                        <div>
-                            <label class="label">Phone Number</label>
-                            <input type="text" class="text-input" id="companyPhone" name="phone" placeholder="Phone number" value="{{ $company->phone ?? '' }}">
+
+                        <div class="field">
+                            <label class="label" for="companyPhone">Phone Number <span class="required-star">*</span></label>
+                            <input type="text" class="text-input @error('phone') is-invalid @enderror" id="companyPhone" name="phone"
+                                placeholder="03001234567 or 042-35123456" maxlength="16" inputmode="tel" data-rule="phone" data-label="Phone number" data-required="1"
+                                value="{{ old('phone', $company->phone ?? '') }}">
+                            @error('phone')<small class="field-error">{{ $message }}</small>@enderror
                         </div>
-                        <div>
-                            <label class="label">Company Email</label>
-                            <input type="email" class="text-input" id="companyEmail" name="email" placeholder="company@example.com" value="{{ $company->email ?? '' }}">
+
+                        <div class="field">
+                            <label class="label" for="companyEmail">Company Email <span class="required-star">*</span></label>
+                            <input type="email" class="text-input @error('email') is-invalid @enderror" id="companyEmail" name="email"
+                                placeholder="company@example.com" maxlength="100" data-rule="email" data-label="Email" data-required="1"
+                                value="{{ old('email', $company->email ?? '') }}">
+                            @error('email')<small class="field-error">{{ $message }}</small>@enderror
                         </div>
-                        <div>
-                            <label class="label">Date Format</label>
-                            <select class="text-input" id="dateFormat" name="date_format">
-                                <option {{ ($company->date_format ?? '') == 'DD-MM-YYYY' ? 'selected' : '' }}>DD-MM-YYYY</option>
-                                <option {{ ($company->date_format ?? '') == 'MM-DD-YYYY' ? 'selected' : '' }}>MM-DD-YYYY</option>
-                                <option {{ ($company->date_format ?? '') == 'YYYY-MM-DD' ? 'selected' : '' }}>YYYY-MM-DD</option>
+
+                        <div class="field">
+                            <label class="label" for="companyDateFormat">Invoice Date Format</label>
+                            <select class="text-input" id="companyDateFormat" name="date_format">
+                                @foreach(['DD-MM-YYYY','MM-DD-YYYY','YYYY-MM-DD'] as $f)
+                                <option value="{{ $f }}" {{ old('date_format', $company->date_format ?? '') == $f ? 'selected' : '' }}>{{ $f }}</option>
+                                @endforeach
                             </select>
+                            <p class="hint">Invoices date will be shown in this format</p>
                         </div>
-                        <div>
-                            <label class="label">Time Format</label>
-                            <select class="text-input" id="timeFormat" name="time_format">
-                                <option {{ ($company->time_format ?? '') == '12 Hour (02:30 PM)' ? 'selected' : '' }}>12 Hour (02:30 PM)</option>
-                                <option {{ ($company->time_format ?? '') == '24 Hour (14:30)' ? 'selected' : '' }}>24 Hour (14:30)</option>
+
+                        <div class="field">
+                            <label class="label" for="companyTimeFormat">Invoice Time Format</label>
+                            <select class="text-input" id="companyTimeFormat" name="time_format">
+                                @foreach(['12 Hour (02:30 PM)','24 Hour (14:30)'] as $f)
+                                <option value="{{ $f }}" {{ old('time_format', $company->time_format ?? '') == $f ? 'selected' : '' }}>{{ $f }}</option>
+                                @endforeach
                             </select>
+                            <p class="hint">Invoices time is shown in this format</p>
                         </div>
                     </div>
-                    <label class="label">Address</label>
-                    <input type="text" class="text-input" id="companyAddress" name="address" placeholder="Company address" value="{{ $company->address ?? '' }}">
+
+                    <div class="field">
+                        <label class="label" for="companyAddress">Address</label>
+                        <input type="text" class="text-input @error('address') is-invalid @enderror" id="companyAddress" name="address"
+                            placeholder="Company address" maxlength="255" data-rule="address" data-label="Address"
+                            value="{{ old('address', $company->address ?? '') }}">
+                        @error('address')<small class="field-error">{{ $message }}</small>@enderror
+                    </div>
                 </form>
             </div>
         </div>
+
         <!-- ========== CONTACT SETTINGS ========== -->
         <div class="section" id="section-contact">
             <div class="settings-card">
-                <div class="settings-top">
-                    <div>
-                        <h3 class="settings-heading"><i class="fa-solid fa-phone"></i> Contact Settings</h3>
-                        <p class="settings-small">How your clients can reach you</p>
+                <form method="POST" action="{{ route('company.save') }}" id="contactForm" class="validate-form" novalidate>
+                    @csrf
+                    <div class="settings-top">
+                        <div>
+                            <h3 class="settings-heading"><i class="fa-solid fa-phone"></i> Contact Settings</h3>
+                            <p class="settings-small">How your clients can reach you</p>
+                        </div>
+                        <button type="submit" class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
                     </div>
-                    <button class="save-btn"><i class="fa-regular fa-floppy-disk"></i> Save Changes</button>
-                </div>
-                <div class="two-cols">
-                    <div>
-                        <label class="label">Phone</label>
-                        <input type="text" class="text-input" placeholder="Phone number">
+
+                    <div class="two-cols">
+                        <div class="field">
+                            <label class="label" for="contactPhone">Phone <span class="required-star">*</span></label>
+                            <input type="text" class="text-input @error('contact_phone') is-invalid @enderror" id="contactPhone" name="contact_phone"
+                                placeholder="03001234567 or 042-35123456" maxlength="16" inputmode="tel" data-rule="phone" data-label="Phone" data-required="1"
+                                value="{{ old('contact_phone', $company->contact_phone ?? '') }}">
+                            @error('contact_phone')<small class="field-error">{{ $message }}</small>@enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="label" for="contactWhatsapp">WhatsApp <span class="required-star">*</span></label>
+                            <input type="text" class="text-input @error('whatsapp') is-invalid @enderror" id="contactWhatsapp" name="whatsapp"
+                                placeholder="03001234567 or +923001234567" maxlength="16" inputmode="tel" data-rule="mobile" data-label="WhatsApp number" data-required="1"
+                                value="{{ old('whatsapp', $company->whatsapp ?? '') }}">
+                            @error('whatsapp')<small class="field-error">{{ $message }}</small>@enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="label" for="contactEmail">Email <span class="required-star">*</span></label>
+                            <input type="email" class="text-input @error('contact_email') is-invalid @enderror" id="contactEmail" name="contact_email"
+                                placeholder="Contact email" maxlength="100" data-rule="email" data-label="Email" data-required="1"
+                                value="{{ old('contact_email', $company->contact_email ?? '') }}">
+                            @error('contact_email')<small class="field-error">{{ $message }}</small>@enderror
+                        </div>
+
+                        <div class="field">
+                            <label class="label" for="contactWebsite">Website</label>
+                            <input type="text" class="text-input @error('website') is-invalid @enderror" id="contactWebsite" name="website"
+                                placeholder="www.example.com" maxlength="255" data-rule="url" data-label="Website"
+                                value="{{ old('website', $company->website ?? '') }}">
+                            @error('website')<small class="field-error">{{ $message }}</small>@enderror
+                        </div>
                     </div>
-                    <div>
-                        <label class="label">WhatsApp</label>
-                        <input type="text" class="text-input" placeholder="WhatsApp number">
-                    </div>
-                    <div>
-                        <label class="label">Email</label>
-                        <input type="text" class="text-input" placeholder="Contact email">
-                    </div>
-                    <div>
-                        <label class="label">Website</label>
-                        <input type="text" class="text-input" placeholder="www.example.com">
-                    </div>
-                </div>
+                </form>
             </div>
         </div>
 

@@ -10,7 +10,9 @@
     <link rel="stylesheet" href="{{ asset('css/style.css') }}">
     <link rel="stylesheet" href="{{ asset('css/layout/sidebar.css') }}">
     <link rel="stylesheet" href="{{ asset('css/layout/navbar.css') }}">
+    <script>window.APP_SETTINGS = @json($appSettings);</script>
     <script src="{{ asset('js/theme.js') }}"></script>
+    <meta name="csrf-token" content="{{ csrf_token() }}">
 
     @stack('styles')
 </head>

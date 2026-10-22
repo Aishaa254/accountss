@@ -137,17 +137,24 @@ document.addEventListener('DOMContentLoaded', applyTitle);
 // Currency: poori site ke liye ek common function
 var currencySymbols = { PKR: 'Rs', USD: '$', AED: 'AED', SAR: 'SAR', EUR: '€' };
 
+function appCurrency() {
+    var s = window.APP_SETTINGS || {};
+    return {
+        code: s.currency || 'PKR',
+        pos: s.symbolPosition || 'before'
+    };
+}
+
 function formatMoney(amount) {
-    var code = localStorage.getItem('currency') || 'PKR';
-    var pos = localStorage.getItem('symbolPosition') || 'before';
-    var sym = currencySymbols[code] || code;
+    var c = appCurrency();
+    var sym = currencySymbols[c.code] || c.code;
     var amt = Number(amount).toLocaleString('en-US');
-    return pos === 'before' ? sym + ' ' + amt : amt + ' ' + sym;
+    return c.pos === 'before' ? sym + ' ' + amt : amt + ' ' + sym;
 }
 
 function applyCurrency() {
-    var code = localStorage.getItem('currency') || 'PKR';
-    var sym = currencySymbols[code] || code;
+    var c = appCurrency();
+    var sym = currencySymbols[c.code] || c.code;
 
     document.querySelectorAll('.money').forEach(function (el) {
         el.textContent = formatMoney(el.dataset.amount);
@@ -158,3 +165,5 @@ function applyCurrency() {
 }
 
 document.addEventListener('DOMContentLoaded', applyCurrency);
+
+   

@@ -1,6 +1,5 @@
-// ---------- Ye cheezein baad mein database / settings se aayengi ----------
+// ---------- Company ki details (ye baad mein Company Settings se aayengi) ----------
 var COMPANY = { name: 'Your Company', address: 'Company address', phone: '0300 0000000' };
-var CUSTOMER_NAMES = ['Ali Traders', 'Sara Fabrics', 'Hamid & Sons', 'Noor Stores', 'Bilal Electronics'];
 
 // ---------- Chhote helper functions ----------
 function $(id) { return document.getElementById(id); }
@@ -24,26 +23,78 @@ function daysUntil(dateStr) {
     return Math.round((a - b) / 86400000);
 }
 
-function toast(msg) {
+function toast(msg, type) {
     var t = $('toast');
     t.textContent = msg;
+    t.classList.toggle('error', type === 'error');
     t.classList.add('show');
-    setTimeout(function () { t.classList.remove('show'); }, 2400);
+    setTimeout(function () { t.classList.remove('show'); }, 2600);
 }
 
-// ---------- customers ka data (tareekhein aaj ke hisaab se khud banti hain) ----------
-var invoices = [
-    { no: 'INV-0001', customer: 'Ali Traders', date: iso(-50), due: iso(-35), items: [{ name: 'Cotton fabric (meter)', qty: 100, price: 600 }], discount: 0, tax: 0, paid: 20000 },
-    { no: 'INV-0002', customer: 'Sara Fabrics', date: iso(-30), due: iso(-15), items: [{ name: 'Lawn suits', qty: 40, price: 500 }], discount: 0, tax: 0, paid: 20000 },
-    { no: 'INV-0003', customer: 'Hamid & Sons', date: iso(-40), due: iso(-25), items: [{ name: 'Embroidered shawls', qty: 50, price: 1900 }], discount: 0, tax: 0, paid: 5000 },
-    { no: 'INV-0004', customer: 'Ali Traders', date: iso(-10), due: iso(5), items: [{ name: 'Cotton fabric (meter)', qty: 70, price: 500 }], discount: 0, tax: 0, paid: 0 },
-    { no: 'INV-0005', customer: 'Bilal Electronics', date: iso(-20), due: iso(-5), items: [{ name: 'LED bulbs', qty: 100, price: 250 }], discount: 0, tax: 0, paid: 25000 },
-    { no: 'INV-0006', customer: 'Noor Stores', date: iso(-2), due: iso(13), items: [{ name: 'Winter caps', qty: 60, price: 200 }], discount: 0, tax: 0, paid: 0 }
-];
+// Field ke neeche laal message dikhana ya hatana
+function setErr(id, msg) {
+    var el = document.querySelector('[data-err="' + id + '"]');
+    if (el) { el.textContent = msg || ''; }
+    var input = $(id);
+    if (input) { input.classList.toggle('is-invalid', !!msg); }
+}
+
+// ---------- Laravel se baat karne wala helper ----------
+function api(method, url, body) {
+    return fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: body ? JSON.stringify(body) : undefined
+    }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+            if (!res.ok) {
+                var err = new Error(data.message || 'Request failed');
+                err.errors = data.errors || {};
+                throw err;
+            }
+            return data;
+        });
+    });
+}
+
+function firstError(e) {
+    var keys = Object.keys(e.errors || {});
+    return keys.length ? e.errors[keys[0]][0] : e.message;
+}
+
+// ---------- Data (ab database se aata hai) ----------
+var invoices = [];
+var customersList = [];
 
 var currentFilter = 'all';
 var viewNo = null;
 var payNo = null;
+var delNo = null;
+var menuNo = null;
+
+function loadInvoices() {
+    return api('GET', '/invoices/list').then(function (data) {
+        invoices = data;
+        renderAll();
+    });
+}
+
+function loadCustomers() {
+    return api('GET', '/customers/list').then(function (data) {
+        customersList = data.filter(function (c) { return c.active; });
+    });
+}
+function loadCompany() {
+    return api('GET', '/company/info').then(function (data) {
+        COMPANY.name = data.name || COMPANY.name;
+        COMPANY.address = data.address || COMPANY.address;
+        COMPANY.phone = data.phone || COMPANY.phone;
+    });
+}
 
 // ---------- Hisaab kitaab ----------
 function totals(inv) {
@@ -87,7 +138,7 @@ function billInner(inv) {
     inv.items.forEach(function (i) {
         rows += '<tr><td>' + esc(i.name || '-') + '</td><td class="r">' + i.qty + '</td><td class="r">' + money(i.price) + '</td><td class="r">' + money(i.qty * i.price) + '</td></tr>';
     });
-    if (!rows) rows = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:18px;">Items yahan nazar ayenge</td></tr>';
+    if (!rows) rows = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:18px;">Items will be shown here</td></tr>';
 
     var sum = '<div><span>Subtotal</span><span>' + money(t.sub) + '</span></div>';
     if (t.disc > 0) sum += '<div><span>Discount</span><span>- ' + money(t.disc) + '</span></div>';
@@ -110,7 +161,8 @@ function billInner(inv) {
 
 // ---------- PDF download ----------
 function downloadBill(inv) {
-    if (typeof html2pdf === 'undefined') { toast('Internet is required for PDF'); return; }
+    if (!inv) return;
+    if (typeof html2pdf === 'undefined') { toast('Internet is required for PDF', 'error'); return; }
     var box = document.createElement('div');
     box.className = 'bill';
     box.style.width = '720px';
@@ -125,20 +177,38 @@ function downloadBill(inv) {
         toast(inv.no + ' PDF is downloaded');
     });
 }
+
 // ---------- Cards, tabs, table ----------
 function renderCards() {
     var month = iso(0).slice(0, 7);
-    var sales = 0, count = 0, dueSum = 0, dueCount = 0;
+    var sales = 0, count = 0;
+    var recv = 0, recvCount = 0;
+    var dueSum = 0, dueCount = 0;
+    var lateSum = 0, lateCount = 0;
+
     invoices.forEach(function (inv) {
         var t = totals(inv);
-        if (inv.date.slice(0, 7) === month) { sales += t.total; count++; }
         var n = daysUntil(inv.due);
-        if (t.balance > 0 && n >= 0 && n <= 7) { dueSum += t.balance; dueCount++; }
+
+        if (inv.date.slice(0, 7) === month) { sales += t.total; count++; }
+
+        if (statusOf(inv) !== 'Paid') {
+            recv += t.balance;
+            recvCount++;
+
+            if (n < 0) { lateSum += t.balance; lateCount++; }
+            else if (n <= 7) { dueSum += t.balance; dueCount++; }
+        }
     });
+
     $('sum-month').textContent = money(sales);
     $('sum-month-note').textContent = count + ' invoice(s) this month';
+    $('sum-recv').textContent = money(recv);
+    $('sum-recv-note').textContent = 'from ' + recvCount + ' invoice(s)';
     $('sum-week').textContent = money(dueSum);
     $('sum-week-note').textContent = dueCount + ' invoice(s) due in 7 days';
+    $('sum-late').textContent = money(lateSum);
+    $('sum-late-note').textContent = lateCount + ' invoice(s) late';
 }
 
 function matchesFilter(inv) {
@@ -182,12 +252,11 @@ function renderTable() {
                 '<div class="paid-text">' + money(inv.paid) + ' paid</div></td>' +
             '<td><span class="badge ' + badge + '">' + s + '</span></td>' +
             '<td><div class="acts">' +
-                '<button class="act" data-act="dl" title="Download PDF"><i class="fa-solid fa-download"></i></button>' +
-                (s !== 'Paid' ? '<button class="act" data-act="pay" title="Record payment"><i class="fa-solid fa-money-bill-wave"></i></button>' : '') +
+                '<button class="act" data-act="menu" title="Quick actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>' +
             '</div></td></tr>';
     });
 
-    if (!html) html = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px;">Koi invoice nahi mila.</td></tr>';
+    if (!html) html = '<tr><td colspan="8" style="text-align:center;color:var(--muted);padding:30px;">No invoice found.</td></tr>';
     $('inv-body').innerHTML = html;
 }
 
@@ -196,6 +265,65 @@ function renderAll() {
     renderTabs();
     renderTable();
 }
+
+// ---------- Teen nuqton ka dropdown ----------
+var menu = document.createElement('div');
+menu.className = 'inv-menu';
+menu.style.display = 'none';
+document.body.appendChild(menu);
+
+function menuItem(action, icon, label, extra) {
+    return '<button type="button" class="inv-menu-item' + (extra ? ' ' + extra : '') + '" data-action="' + action + '">' +
+        '<i class="' + icon + '"></i>' + label + '</button>';
+}
+
+function closeMenu() {
+    menu.style.display = 'none';
+    menuNo = null;
+}
+
+function openMenu(btn, inv) {
+    var s = statusOf(inv);
+    var html = menuItem('view', 'fa-regular fa-eye', 'View');
+    html += menuItem('dl', 'fa-solid fa-download', 'Download PDF');
+    if (s !== 'Paid') { html += menuItem('pay', 'fa-solid fa-money-bill-wave', 'Record Payment'); }
+    if (s === 'Unpaid') {
+        html += '<div class="inv-menu-sep"></div>' + menuItem('del', 'fa-regular fa-trash-can', 'Delete', 'danger');
+    }
+
+    menu.innerHTML = html;
+    menu.style.display = 'block';
+    menuNo = inv.no;
+
+    var r = btn.getBoundingClientRect();
+    var top = r.bottom + 6;
+    if (top + menu.offsetHeight > window.innerHeight - 10) { top = r.top - menu.offsetHeight - 6; }
+    var left = Math.max(10, r.right - menu.offsetWidth);
+
+    menu.style.top = Math.max(10, top) + 'px';
+    menu.style.left = left + 'px';
+}
+
+menu.addEventListener('click', function (e) {
+    var el = e.target.closest('.inv-menu-item');
+    if (!el) return;
+
+    var action = el.dataset.action;
+    var no = menuNo;
+    closeMenu();
+    if (!no) return;
+
+    if (action === 'view') openView(no);
+    else if (action === 'dl') downloadBill(findInv(no));
+    else if (action === 'pay') openPay(no);
+    else if (action === 'del') askDelete(no);
+});
+
+document.addEventListener('click', function (e) {
+    if (!menu.contains(e.target) && !e.target.closest('button.act')) closeMenu();
+});
+window.addEventListener('scroll', closeMenu, true);
+window.addEventListener('resize', closeMenu);
 
 // ---------- Invoice dekhna ----------
 function openView(no) {
@@ -223,13 +351,44 @@ function savePay() {
     var inv = findInv(payNo);
     var t = totals(inv);
     var amount = parseFloat($('pay-amount').value) || 0;
-    if (amount <= 0) { $('pay-error').textContent = 'Raqam likho.'; return; }
-    if (amount > Math.round(t.balance)) { $('pay-error').textContent = 'Balance se zyada nahi ho sakta.'; return; }
-    inv.paid += amount;
-    $('pay-modal').classList.remove('show');
-    renderAll();
-    if ($('view-modal').classList.contains('show')) openView(payNo);
-    toast('Payment save ho gayi');
+    if (amount <= 0) { $('pay-error').textContent = 'Enter Amount.'; return; }
+    if (amount > Math.round(t.balance)) { $('pay-error').textContent = 'Can not be more than balance.'; return; }
+
+    api('POST', '/invoices/' + encodeURIComponent(payNo) + '/pay', { amount: amount })
+        .then(function () {
+            $('pay-modal').classList.remove('show');
+            toast('Payment is saved');
+            return loadInvoices();
+        })
+        .then(function () {
+            if ($('view-modal').classList.contains('show')) openView(payNo);
+        })
+        .catch(function (e) {
+            $('pay-error').textContent = firstError(e) || 'Could not save the payment.';
+        });
+}
+
+// ---------- Delete ----------
+function askDelete(no) {
+    delNo = no;
+    $('del-text').textContent = no + ' will be removed. This cannot be undone.';
+    $('del-modal').classList.add('show');
+}
+
+function confirmDelete() {
+    var no = delNo;
+    if (!no) return;
+
+    api('DELETE', '/invoices/' + encodeURIComponent(no))
+        .then(function () {
+            $('del-modal').classList.remove('show');
+            toast(no + ' deleted');
+            loadInvoices();
+        })
+        .catch(function (e) {
+            $('del-modal').classList.remove('show');
+            toast(e.message || 'Could not delete the invoice', 'error');
+        });
 }
 
 // ---------- Naya invoice ----------
@@ -255,14 +414,15 @@ function readItems() {
     return list;
 }
 
-function validItems() {
-    return readItems().filter(function (i) { return i.name && i.qty > 0 && i.price > 0; });
+function selectedCustomerName() {
+    var sel = $('n-customer');
+    return sel.value ? sel.options[sel.selectedIndex].text : '-';
 }
 
 function draft() {
     return {
         no: nextNo(),
-        customer: $('n-customer').value || '-',
+        customer: selectedCustomerName(),
         date: iso(0),
         due: $('n-due').value || iso(15),
         items: readItems().filter(function (i) { return i.name || i.price; }),
@@ -274,9 +434,11 @@ function draft() {
 
 function updatePreview() { $('new-bill').innerHTML = billInner(draft()); }
 
+var newErrIds = ['n-customer', 'n-due', 'items', 'n-discount', 'n-tax'];
+
 function openNew() {
     var opts = '<option value="">Select customer</option>';
-    CUSTOMER_NAMES.forEach(function (n) { opts += '<option>' + esc(n) + '</option>'; });
+    customersList.forEach(function (c) { opts += '<option value="' + c.id + '">' + esc(c.name) + '</option>'; });
     $('n-customer').innerHTML = opts;
     $('n-due').value = iso(15);
     $('n-discount').value = 0;
@@ -284,27 +446,112 @@ function openNew() {
     $('items').innerHTML = '';
     addItemRow();
     $('new-error').textContent = '';
+    newErrIds.forEach(function (id) { setErr(id, ''); });
     updatePreview();
     $('new-modal').classList.add('show');
 }
 
+// Saari zaroori cheezein check karna. Theek ho to data wapas, warna null
+function validateNew() {
+    newErrIds.forEach(function (id) { setErr(id, ''); });
+    document.querySelectorAll('#items .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
+    $('new-error').textContent = '';
+
+    var ok = true;
+
+    // Customer
+    if (!$('n-customer').value) { setErr('n-customer', 'Select a customer'); ok = false; }
+
+    // Due date
+    var due = $('n-due').value;
+    if (!due) { setErr('n-due', 'Choose the due date'); ok = false; }
+    else if (due < iso(0)) { setErr('n-due', 'Due date cannot be before today'); ok = false; }
+
+    // Items (bilkul khali row ignore, baqi check)
+    var items = [];
+    var itemMsg = '';
+    document.querySelectorAll('#items .item-row').forEach(function (row) {
+        var nameEl = row.querySelector('.it-name');
+        var qtyEl = row.querySelector('.it-qty');
+        var priceEl = row.querySelector('.it-price');
+        var name = nameEl.value.trim();
+        var priceRaw = priceEl.value.trim();
+
+        if (!name && priceRaw === '') return;
+
+        var qty = parseFloat(qtyEl.value);
+        var price = parseFloat(priceRaw);
+
+        if (!name) { nameEl.classList.add('is-invalid'); itemMsg = 'Every item needs a name'; }
+        else if (isNaN(qty) || qty <= 0) { qtyEl.classList.add('is-invalid'); itemMsg = 'Quantity must be more than 0'; }
+        else if (isNaN(price) || price <= 0) { priceEl.classList.add('is-invalid'); itemMsg = 'Enter a price more than 0 for "' + name + '"'; }
+        else { items.push({ name: name, qty: qty, price: price }); }
+    });
+    if (!itemMsg && !items.length) { itemMsg = 'Add at least one item'; }
+    if (itemMsg) { setErr('items', itemMsg); ok = false; }
+
+    // Discount
+    var subtotal = items.reduce(function (s, i) { return s + i.qty * i.price; }, 0);
+    var discRaw = $('n-discount').value.trim();
+    var discount = discRaw === '' ? 0 : Number(discRaw);
+    if (isNaN(discount) || discount < 0) { setErr('n-discount', 'Enter 0 or more'); ok = false; }
+    else if (items.length && discount > subtotal) { setErr('n-discount', 'Discount cannot be more than the subtotal'); ok = false; }
+
+    // Tax
+    var taxRaw = $('n-tax').value.trim();
+    var tax = taxRaw === '' ? 0 : Number(taxRaw);
+    if (isNaN(tax) || tax < 0 || tax > 100) { setErr('n-tax', 'Enter a percentage between 0 and 100'); ok = false; }
+
+    return ok ? { items: items, discount: discount, tax: tax, due: due } : null;
+}
+
+// Server ke bheje hue errors ko sahi field ke neeche dikhana
+function showServerErrors(e) {
+    var map = { customer_id: 'n-customer', due: 'n-due', discount: 'n-discount', tax: 'n-tax' };
+    var shown = false;
+
+    Object.keys(e.errors || {}).forEach(function (key) {
+        var id = map[key] || (key.indexOf('items') === 0 ? 'items' : null);
+        if (id) { setErr(id, e.errors[key][0]); shown = true; }
+    });
+
+    if (!shown) { $('new-error').textContent = e.message || 'Could not save the invoice.'; }
+}
+
 function saveNew() {
-    var d = draft();
-    var items = validItems();
-    if (!$('n-customer').value) { $('new-error').textContent = 'Select Customer.'; return; }
-    if (!items.length) { $('new-error').textContent = 'Choose Atlleast One Item (name, quantity,price).'; return; }
-    d.items = items;
-    invoices.unshift(d);
-    $('new-modal').classList.remove('show');
-    renderAll();
-    toast(d.no + ' done');
+    var v = validateNew();
+    if (!v) return;
+
+    $('new-save').disabled = true;
+
+    api('POST', '/invoices', {
+        customer_id: $('n-customer').value,
+        due: v.due,
+        discount: v.discount,
+        tax: v.tax,
+        items: v.items
+    })
+        .then(function (res) {
+            $('new-modal').classList.remove('show');
+            toast(res.no + ' created');
+            loadInvoices().then(function () { openView(res.no); });
+        })
+        .catch(showServerErrors)
+        .then(function () { $('new-save').disabled = false; });
 }
 
 // ---------- Buttons aur clicks ----------
 $('open-new').addEventListener('click', openNew);
 $('add-item').addEventListener('click', function () { addItemRow(); updatePreview(); });
-$('new-form').addEventListener('input', updatePreview);
-$('new-form').addEventListener('change', updatePreview);
+
+function onFormEdit(e) {
+    e.target.classList.remove('is-invalid');
+    if (e.target.id) { setErr(e.target.id, ''); }
+    if (e.target.closest('#items')) { setErr('items', ''); }
+    updatePreview();
+}
+$('new-form').addEventListener('input', onFormEdit);
+$('new-form').addEventListener('change', onFormEdit);
 $('new-form').addEventListener('click', function (e) {
     if (e.target.closest('.it-del')) {
         var rows = document.querySelectorAll('#items .item-row');
@@ -313,12 +560,6 @@ $('new-form').addEventListener('click', function (e) {
 });
 
 $('new-save').addEventListener('click', saveNew);
-$('new-dl').addEventListener('click', function () {
-    if (!validItems().length) { $('new-error').textContent = 'PDF ke liye pehle ek item likho.'; return; }
-    var d = draft();
-    d.items = validItems();
-    downloadBill(d);
-});
 $('new-close').addEventListener('click', function () { $('new-modal').classList.remove('show'); });
 $('new-cancel').addEventListener('click', function () { $('new-modal').classList.remove('show'); });
 
@@ -330,17 +571,22 @@ $('pay-save').addEventListener('click', savePay);
 $('pay-close').addEventListener('click', function () { $('pay-modal').classList.remove('show'); });
 $('pay-cancel').addEventListener('click', function () { $('pay-modal').classList.remove('show'); });
 
-['new-modal', 'view-modal', 'pay-modal'].forEach(function (id) {
+$('del-ok').addEventListener('click', confirmDelete);
+$('del-close').addEventListener('click', function () { $('del-modal').classList.remove('show'); });
+$('del-cancel').addEventListener('click', function () { $('del-modal').classList.remove('show'); });
+
+['new-modal', 'view-modal', 'pay-modal', 'del-modal'].forEach(function (id) {
     $(id).addEventListener('click', function (e) { if (e.target === $(id)) $(id).classList.remove('show'); });
 });
 
 $('inv-body').addEventListener('click', function (e) {
     var row = e.target.closest('tr');
     if (!row || !row.dataset.no) return;
+
     var btn = e.target.closest('button.act');
     if (btn) {
-        if (btn.dataset.act === 'dl') downloadBill(findInv(row.dataset.no));
-        if (btn.dataset.act === 'pay') openPay(row.dataset.no);
+        if (menuNo === row.dataset.no && menu.style.display === 'block') { closeMenu(); }
+        else { openMenu(btn, findInv(row.dataset.no)); }
         return;
     }
     openView(row.dataset.no);
@@ -359,8 +605,12 @@ document.querySelectorAll('.filter-btn').forEach(function (b) {
 
 document.addEventListener('keydown', function (e) {
     if (e.key === 'Escape') {
-        ['new-modal', 'view-modal', 'pay-modal'].forEach(function (id) { $(id).classList.remove('show'); });
+        closeMenu();
+        ['new-modal', 'view-modal', 'pay-modal', 'del-modal'].forEach(function (id) { $(id).classList.remove('show'); });
     }
 });
 
-renderAll();
+// ---------- Page khulte hi data mangwana ----------
+loadCustomers();
+loadInvoices();
+loadCompany();

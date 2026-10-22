@@ -1,21 +1,6 @@
 (function () {
     // ---------- Sample data (backend ke baad asli data aayega) ----------
-    var vendors = [
-        { id: 1, name: 'Karim Steel House',        company: 'Karim & Sons',        category: 'Raw Material', phone: '0300-1234567', email: 'karim@example.com',  city: 'Gujranwala', balance: 40000, paid: 60000,  dueIn: 5,    status: 'active',   pinned: true,  createdAgo: 120, terms: 30 },
-        { id: 2, name: 'Noor Packaging',           company: 'Noor Packaging Pvt',  category: 'Services',     phone: '0321-7654321', email: 'noor@example.com',   city: 'Lahore',     balance: 90000, paid: 10000,  dueIn: -12,  status: 'active',   pinned: false, createdAgo: 200, terms: 15 },
-        { id: 3, name: 'City Transport Co.',       company: 'City Logistics',      category: 'Transport',    phone: '0345-1112233', email: 'city@example.com',   city: 'Gujranwala', balance: 0,     paid: 120000, dueIn: null, status: 'inactive', pinned: false, createdAgo: 300, terms: 30 },
-        { id: 4, name: 'Lahore Electric Supplies', company: 'LES Traders',         category: 'Utilities',    phone: '0312-5557788', email: 'les@example.com',    city: 'Lahore',     balance: 55000, paid: 45000,  dueIn: 20,   status: 'active',   pinned: false, createdAgo: 150, terms: 30 },
-        { id: 5, name: 'Al-Madina Traders',        company: 'Al-Madina Group',     category: 'Raw Material', phone: '0333-9988776', email: 'madina@example.com', city: 'Sialkot',    balance: 20000, paid: 80000,  dueIn: 3,    status: 'active',   pinned: false, createdAgo: 80,  terms: 15 },
-        { id: 6, name: 'Bismillah Stationers',     company: 'Bismillah & Co',      category: 'Services',     phone: '0301-4443322', email: 'bis@example.com',    city: 'Gujranwala', balance: 0,     paid: 35000,  dueIn: null, status: 'active',   pinned: false, createdAgo: 5,   terms: 7 },
-        { id: 7, name: 'Shan Printers',            company: 'Shan Printing Press', category: 'Services',     phone: '0322-1239874', email: 'shan@example.com',   city: 'Faisalabad', balance: 80000, paid: 20000,  dueIn: 30,   status: 'active',   pinned: false, createdAgo: 3,   terms: 30 },
-        { id: 8, name: 'Fast Courier',             company: 'Fast Logistics',      category: 'Transport',    phone: '0346-7771122', email: 'fast@example.com',   city: 'Lahore',     balance: 0,     paid: 15000,  dueIn: null, status: 'inactive', pinned: false, createdAgo: 60,  terms: 7 }
-    ];
-
-    vendors.forEach(function (v) {
-        v.address = v.address || '';
-        v.notes = v.notes || '';
-        v.history = [];
-    });
+    var vendors = [];
 
     var state = { filter: 'all', search: '', sort: 'name', page: 1, perPage: 5 };
     var openId = null;      // dropdown menu
@@ -26,6 +11,27 @@
 
     // ---------- Chhote helpers ----------
     function $(id) { return document.getElementById(id); }
+    function api(method, url, body) {
+        return fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (res) {
+            if (!res.ok) { throw new Error('request failed'); }
+            return res.json();
+        });
+    }
+    
+    function loadVendors() {
+        api('GET', '/vendors/list').then(function (data) {
+            vendors = data;
+            render();
+        });
+    }
 
     function money(n) {
         return formatMoney(n);
@@ -324,9 +330,13 @@
         else if (action === 'edit') { openForm(v); }
         else if (action === 'delete') { askDelete(v); }
         else if (action === 'pin') {
-            v.pinned = !v.pinned;
-            render();
-            toast(v.pinned ? 'Vendor pinned to top' : 'Vendor unpinned');
+            var newPin = !v.pinned;
+            api('PUT', '/vendors/' + v.id, { pinned: newPin })
+                .then(function () {
+                    toast(newPin ? 'Vendor pinned to top' : 'Vendor unpinned');
+                    loadVendors();
+                })
+                .catch(function () { toast('Could not change pin'); });
         }
     });
 
@@ -348,55 +358,17 @@
     }
 
     function purchasesFor(v) {
-        var total = v.balance + v.paid;
-        if (total <= 0) { return []; }
-
-        var a1 = Math.round(total * 0.2);
-        var a2 = Math.round(total * 0.3);
-        var a3 = total - a1 - a2;
-
-        var items = [
-            { no: 'PO-' + (v.id * 100 + 3), ago: 12, amount: a1 },
-            { no: 'PO-' + (v.id * 100 + 2), ago: 40, amount: a2 },
-            { no: 'PO-' + (v.id * 100 + 1), ago: 75, amount: a3 }
-        ];
-
-        var left = v.paid;
-        for (var i = items.length - 1; i >= 0; i--) {
-            if (left >= items[i].amount) {
-                items[i].status = 'Paid';
-                left -= items[i].amount;
-            } else if (left > 0) {
-                items[i].status = 'Partial';
-                left = 0;
-            } else {
-                items[i].status = 'Unpaid';
-            }
-        }
-        return items;
-    }
-
-    function paymentsFor(v) {
-        var list = [];
-
-        // Jo payments tum ne yahan record ki hain, wo sab se upar
-        v.history.forEach(function (h) {
-            var d = new Date(h.date + 'T00:00:00');
-            list.push({ label: fmtDate(d), amount: h.amount, method: h.method, note: h.note });
+        return (v.purchases || []).map(function (p) {
+            return { no: p.no, label: fmtDate(new Date(p.date + 'T00:00:00')), amount: p.amount, status: p.status };
         });
-
-        // Baqi purani payments sample hain
-        var recorded = v.history.reduce(function (s, h) { return s + h.amount; }, 0);
-        var older = v.paid - recorded;
-        if (older > 0) {
-            var p1 = Math.round(older * 0.6);
-            list.push({ label: dateAgo(20), amount: p1, method: 'Bank Transfer', note: '' });
-            if (older - p1 > 0) {
-                list.push({ label: dateAgo(55), amount: older - p1, method: 'Cash', note: '' });
-            }
-        }
-        return list;
     }
+    function paymentsFor(v) {
+        return v.history.map(function (h) {
+            var d = new Date(h.date + 'T00:00:00');
+            return { label: fmtDate(d), amount: h.amount, method: h.method, note: h.note };
+        });
+    }
+     
 
     function panelHtml(v) {
         var total = v.balance + v.paid;
@@ -415,7 +387,7 @@
             ? purchases.map(function (p) {
                 return '<div class="vd-item">' +
                     '<div><div class="vd-item-main">' + esc(p.no) + '</div>' +
-                    '<div class="vd-item-sub">' + dateAgo(p.ago) + '</div></div>' +
+                    '<div class="vd-item-sub">' + esc(p.label) + '</div></div>' +
                     '<div class="vd-item-right"><div class="vd-item-main">' + money(p.amount) + '</div>' +
                     '<span class="vd-st vd-st-' + p.status.toLowerCase() + '">' + p.status + '</span></div>' +
                 '</div>';
@@ -607,49 +579,40 @@
         }
 
         if (!ok) { return; }
-
         var phone = phoneDigits.slice(0, 4) + '-' + phoneDigits.slice(4);
 
-        if (editingId) {
-            var v = findVendor(editingId);
-            v.name = name;
-            v.company = company;
-            v.category = $('fCategory').value;
-            v.phone = phone;
-            v.email = email;
-            v.city = $('fCity').value.trim();
-            v.address = $('fAddress').value.trim();
-            v.notes = $('fNotes').value.trim();
-            v.status = $('fStatus').value;
-            v.terms = termsNum;
-            toast('Vendor updated');
-        } else {
-            var newId = vendors.reduce(function (m, x) { return Math.max(m, x.id); }, 0) + 1;
-            vendors.push({
-                id: newId,
-                name: name,
-                company: company,
-                category: $('fCategory').value,
-                phone: phone,
-                email: email,
-                city: $('fCity').value.trim(),
-                address: $('fAddress').value.trim(),
-                notes: $('fNotes').value.trim(),
-                status: $('fStatus').value,
-                terms: termsNum,
-                balance: balance,
-                paid: 0,
-                dueIn: balance > 0 ? termsNum : null,
-                pinned: false,
-                createdAgo: 0,
-                history: []
-            });
-            state.page = 1;
-            toast('Vendor added');
-        }
+        var data = {
+            name: name,
+            company: company,
+            category: $('fCategory').value,
+            phone: phone,
+            email: email,
+            city: $('fCity').value.trim(),
+            address: $('fAddress').value.trim(),
+            notes: $('fNotes').value.trim(),
+            status: $('fStatus').value,
+            terms: termsNum
+        };
 
-        closeModal('vdFormModal');
-        render();
+        if (editingId) {
+            api('PUT', '/vendors/' + editingId, data)
+                .then(function () {
+                    toast('Vendor updated');
+                    closeModal('vdFormModal');
+                    loadVendors();
+                })
+                .catch(function () { toast('Could not update vendor'); });
+        } else {
+            data.balance = balance;
+            api('POST', '/vendors', data)
+                .then(function () {
+                    state.page = 1;
+                    toast('Vendor added');
+                    closeModal('vdFormModal');
+                    loadVendors();
+                })
+                .catch(function () { toast('Could not add vendor'); });
+        }
     }
 
     $('addVendorBtn').addEventListener('click', function () { openForm(null); });
@@ -707,20 +670,19 @@
         if (!ok) { return; }
 
         amount = Math.round(amount * 100) / 100;
-        v.balance = Math.round((v.balance - amount) * 100) / 100;
-        v.paid = Math.round((v.paid + amount) * 100) / 100;
-        v.history.unshift({
-            date: date,
+
+        api('POST', '/vendors/' + v.id + '/pay', {
             amount: amount,
+            date: date,
             method: $('pMethod').value,
             note: $('pNote').value.trim()
-        });
-
-        if (v.balance <= 0) { v.balance = 0; v.dueIn = null; }
-
-        closeModal('vdPayModal');
-        render();
-        toast('Payment of ' + money(amount) + ' recorded');
+        })
+            .then(function () {
+                closeModal('vdPayModal');
+                toast('Payment of ' + money(amount) + ' recorded');
+                loadVendors();
+            })
+            .catch(function () { toast('Could not record payment'); });
     });
 
     // ---------- WhatsApp payment update ----------
@@ -751,10 +713,13 @@
         var v = findVendor(deleteId);
         if (!v) { return; }
 
-        vendors.splice(vendors.indexOf(v), 1);
-        closeModal('vdConfirmModal');
-        render();
-        toast('Vendor deleted');
+        api('DELETE', '/vendors/' + v.id)
+        .then(function () {
+            closeModal('vdConfirmModal');
+            toast('Vendor deleted');
+            loadVendors();
+        })
+        .catch(function () { toast('Could not delete vendor'); });
     });
 
     // ---------- Popup band karna ----------
@@ -813,5 +778,5 @@
         render();
     });
 
-    render();
+    loadVendors();
 })();

@@ -17,62 +17,15 @@
         return new Date(+p[0], +p[1] - 1, +p[2]).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
     }
 
-    // ---------- Sample data (backend ke baad asli data aayega) ----------
-    var seed = 7;
-    function rnd() { seed = (seed * 16807) % 2147483647; return seed / 2147483647; }
-    function pick(a) { return a[Math.floor(rnd() * a.length)]; }
-    function between(a, b) { return Math.round((a + rnd() * (b - a)) / 500) * 500; }
-
-    var customers = ['Ali Traders', 'Sara Fabrics', 'Hamid & Sons', 'Bilal Electronics', 'Noor Stores'];
-    var vendors = ['Karim Steel House', 'Noor Packaging', 'Lahore Electric Supplies', 'Al-Madina Traders', 'Shan Printers'];
-    var titles = { Utilities: 'Electricity and internet', Transport: 'Delivery and fuel', Supplies: 'Office supplies', Other: 'Miscellaneous' };
-
     var now = new Date();
-    var sales = [], purchases = [], expenses = [];
-
-    for (var m = 11; m >= 0; m--) {
-        var first = new Date(now.getFullYear(), now.getMonth() - m, 1);
-        var maxDay = m === 0 ? now.getDate() : new Date(now.getFullYear(), now.getMonth() - m + 1, 0).getDate();
-        var day = function (n) { return toStr(new Date(first.getFullYear(), first.getMonth(), Math.min(maxDay, n))); };
-        var random = function () { return day(1 + Math.floor(rnd() * maxDay)); };
-
-        for (var i = 0; i < 4; i++) { sales.push({ date: random(), name: pick(customers), amount: between(40000, 200000) }); }
-        for (var j = 0; j < 3; j++) { purchases.push({ date: random(), name: pick(vendors), amount: between(30000, 120000) }); }
-
-        expenses.push({ date: day(1),  category: 'Rent',     title: 'Shop rent',      amount: 60000 });
-        expenses.push({ date: day(28), category: 'Salaries', title: 'Staff salaries', amount: 85000 });
-        ['Utilities', 'Transport', 'Supplies', 'Other'].forEach(function (c) {
-            if (c === 'Other' && rnd() < 0.5) { return; }
-            var range = { Utilities: [15000, 22000], Transport: [8000, 16000], Supplies: [3000, 9000], Other: [2000, 7000] }[c];
-            expenses.push({ date: random(), category: c, title: titles[c], amount: between(range[0], range[1]) });
-        });
-    }
-
-    var receivables = [
-        { name: 'Hamid & Sons',      amount: 90000, late: 25 },
-        { name: 'Ali Traders',       amount: 40000, late: 35 },
-        { name: 'Bilal Electronics', amount: 52000, late: 70 },
-        { name: 'Hamid & Sons',      amount: 28000, late: 105 },
-        { name: 'Ali Traders',       amount: 35000, late: -5 },
-        { name: 'Sara Fabrics',      amount: 48000, late: -6 },
-        { name: 'Noor Stores',       amount: 12000, late: -13 }
-    ];
-
-    var payables = [
-        { name: 'Noor Packaging',          amount: 90000, late: 25 },
-        { name: 'City Transport Co.',      amount: 30000, late: 64 },
-        { name: 'Al-Madina Traders',       amount: 20000, late: 3 },
-        { name: 'Karim Steel House',       amount: 40000, late: -5 },
-        { name: 'Lahore Electric Supplies', amount: 55000, late: -10 },
-        { name: 'Shan Printers',           amount: 80000, late: -27 }
-    ];
+    var sales = [], purchases = [], expenses = [], receivables = [], payables = [];
 
     var buckets = [
-        { label: 'Not due',  color: '#22c55e', test: function (x) { return x.late <= 0; } },
-        { label: '1-30',     color: '#eab308', test: function (x) { return x.late >= 1 && x.late <= 30; } },
-        { label: '31-60',    color: '#f97316', test: function (x) { return x.late >= 31 && x.late <= 60; } },
-        { label: '61-90',    color: '#ef4444', test: function (x) { return x.late >= 61 && x.late <= 90; } },
-        { label: '90+',      color: '#b91c1c', test: function (x) { return x.late > 90; } }
+        { label: 'Not due', color: '#22c55e', test: function (x) { return x.late <= 0; } },
+        { label: '1-30', color: '#eab308', test: function (x) { return x.late >= 1 && x.late <= 30; } },
+        { label: '31-60', color: '#f97316', test: function (x) { return x.late >= 31 && x.late <= 60; } },
+        { label: '61-90', color: '#ef4444', test: function (x) { return x.late >= 61 && x.late <= 90; } },
+        { label: '90+', color: '#b91c1c', test: function (x) { return x.late > 90; } }
     ];
 
     var palette = ['#0ea5e9', '#8b5cf6', '#f97316', '#ec4899', '#10b981', '#f59e0b'];
@@ -204,9 +157,9 @@
 
         var left = '<div class="rp-card"><h3>Top customers</h3>' +
             '<div class="rp-stats">' +
-                '<div class="rp-stat"><span>Total sales</span><b>' + money(cur.S) + '</b></div>' +
-                '<div class="rp-stat"><span>Invoices</span><b>' + cur.s.length + '</b></div>' +
-                '<div class="rp-stat"><span>Average invoice</span><b>' + money(avg) + '</b></div>' +
+            '<div class="rp-stat"><span>Total sales</span><b>' + money(cur.S) + '</b></div>' +
+            '<div class="rp-stat"><span>Invoices</span><b>' + cur.s.length + '</b></div>' +
+            '<div class="rp-stat"><span>Average invoice</span><b>' + money(avg) + '</b></div>' +
             '</div>' +
             (top.length ? top.map(function (c) { return barRow(c.name, c.value, top[0].value, 'f-sales'); }).join('') : '<div class="rp-empty">No sales in this period</div>') +
             '</div>';
@@ -260,7 +213,7 @@
                     '<b>' + money(r.value) + ' <small>(' + r.count + ')</small></b></div>';
             }).join('') +
             '<div class="rp-risk ' + (over60 ? 'warn' : 'ok') + '">' +
-                (over60 ? money(over60) + ' is more than 60 days late' : 'Nothing is more than 60 days late') + '</div>' +
+            (over60 ? money(over60) + ' is more than 60 days late' : 'Nothing is more than 60 days late') + '</div>' +
             (oldest.length ? '<h4>Oldest</h4>' + oldest.map(function (x) {
                 return '<div class="rp-item"><div>' + esc(x.name) + '<small>' + x.late + ' days late</small></div><b>' + money(x.amount) + '</b></div>';
             }).join('') : '') + '</div>';
@@ -288,11 +241,13 @@
     function renderCards() {
         var diff = cur.margin - prev.margin;
         var cards = [
-            { label: 'Revenue',       icon: 'fa-arrow-trend-up', cls: 'c-sales',  value: cur.S,         fmt: money, d: delta(cur.S, prev.S, true) },
-            { label: 'Costs',         icon: 'fa-wallet',         cls: 'c-cost',   value: cur.P + cur.E, fmt: money, d: delta(cur.P + cur.E, prev.P + prev.E, false) },
-            { label: 'Net Profit',    icon: 'fa-sack-dollar',    cls: 'c-profit', value: cur.profit,    fmt: money, d: delta(cur.profit, prev.profit, true) },
-            { label: 'Profit Margin', icon: 'fa-percent',        cls: 'c-margin', value: cur.margin,    fmt: function (v) { return v.toFixed(1) + '%'; },
-              d: '<span class="rp-delta ' + (diff >= 0 ? 'good' : 'bad') + '">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' pts vs previous</span>' }
+            { label: 'Revenue', icon: 'fa-arrow-trend-up', cls: 'c-sales', value: cur.S, fmt: money, d: delta(cur.S, prev.S, true) },
+            { label: 'Costs', icon: 'fa-wallet', cls: 'c-cost', value: cur.P + cur.E, fmt: money, d: delta(cur.P + cur.E, prev.P + prev.E, false) },
+            { label: 'Net Profit', icon: 'fa-sack-dollar', cls: 'c-profit', value: cur.profit, fmt: money, d: delta(cur.profit, prev.profit, true) },
+            {
+                label: 'Profit Margin', icon: 'fa-percent', cls: 'c-margin', value: cur.margin, fmt: function (v) { return v.toFixed(1) + '%'; },
+                d: '<span class="rp-delta ' + (diff >= 0 ? 'good' : 'bad') + '">' + (diff >= 0 ? '+' : '') + diff.toFixed(1) + ' pts vs previous</span>'
+            }
         ];
 
         $('rpCards').innerHTML = cards.map(function (c, i) {
@@ -380,6 +335,20 @@
     });
 
     $('rpPrint').addEventListener('click', function () { window.print(); });
-
-    update();
+    fetch('/reports/data', { headers: { 'Accept': 'application/json' } })
+        .then(function (res) {
+            if (!res.ok) { throw new Error('request failed'); }
+            return res.json();
+        })
+        .then(function (data) {
+            sales = data.sales;
+            purchases = data.purchases;
+            expenses = data.expenses;
+            receivables = data.receivables;
+            payables = data.payables;
+            update();
+        })
+        .catch(function () {
+            $('rpRange').textContent = 'Reports could not be loaded';
+        });
 })();

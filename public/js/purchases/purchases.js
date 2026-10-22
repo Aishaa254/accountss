@@ -8,7 +8,6 @@
     function todayStr() { return toStr(new Date()); }
     function addDays(s, n) { var d = parse(s); d.setDate(d.getDate() + n); return toStr(d); }
     function diffDays(a, b) { return Math.round((parse(a) - parse(b)) / 86400000); }
-    function ago(n) { return addDays(todayStr(), -n); }
     function fmt(s) { return parse(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
     function round2(n) { return Math.round(n * 100) / 100; }
 
@@ -24,48 +23,46 @@
             .replace(/"/g, '&quot;');
     }
 
-    // ---------- Sample data (backend ke baad asli data aayega) ----------
-    var vendorList = [
-        'Karim Steel House', 'Noor Packaging', 'City Transport Co.', 'Lahore Electric Supplies',
-        'Al-Madina Traders', 'Bismillah Stationers', 'Shan Printers', 'Fast Courier'
-    ];
-
-    function make(id, vendor, daysAgo, terms, items, pays, notes) {
-        var date = ago(daysAgo);
-        return {
-            id: id,
-            no: 'PO-' + ('000' + id).slice(-4),
-            vendor: vendor,
-            date: date,
-            due: addDays(date, terms),
-            items: items,
-            notes: notes || '',
-            payments: pays.map(function (p) {
-                return { date: ago(p[0]), amount: p[1], method: p[2] };
-            })
-        };
+    // ---------- Laravel se baat karne wala helper ----------
+    function api(method, url, body) {
+        return fetch(url, {
+            method: method,
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+            },
+            body: body ? JSON.stringify(body) : undefined
+        }).then(function (res) {
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) { throw new Error(data.message || 'request failed'); }
+                return data;
+            });
+        });
     }
 
-    var purchases = [
-        make(1, 'Karim Steel House', 12, 30,
-            [{ desc: 'Steel rods 10mm', qty: 200, price: 450 }, { desc: 'Binding wire (kg)', qty: 50, price: 300 }],
-            [[8, 60000, 'Bank Transfer']], 'Delivery to main godown'),
-        make(2, 'Noor Packaging', 40, 15,
-            [{ desc: 'Cartons (large)', qty: 500, price: 150 }, { desc: 'Packing tape rolls', qty: 100, price: 250 }],
-            [[30, 10000, 'Cash']], ''),
-        make(3, 'City Transport Co.', 75, 30,
-            [{ desc: 'Freight, Lahore trips', qty: 12, price: 10000 }],
-            [[50, 70000, 'Bank Transfer'], [40, 50000, 'Cash']], ''),
-        make(4, 'Lahore Electric Supplies', 20, 30,
-            [{ desc: 'Cable 2.5mm (roll)', qty: 100, price: 700 }, { desc: 'Switches', qty: 200, price: 200 }],
-            [[10, 45000, 'Cheque']], ''),
-        make(5, 'Al-Madina Traders', 18, 15,
-            [{ desc: 'Cotton bales', qty: 40, price: 2500 }],
-            [[12, 80000, 'Bank Transfer']], ''),
-        make(6, 'Shan Printers', 3, 30,
-            [{ desc: 'Brochures', qty: 5000, price: 12 }, { desc: 'Banners', qty: 10, price: 2000 }],
-            [], 'Needed before the exhibition')
-    ];
+    // ---------- Data (ab database se aata hai) ----------
+    var purchases = [];
+    var vendorsData = [];
+
+    function vendorNames() {
+        return vendorsData.map(function (v) { return v.name; });
+    }
+
+    function loadPurchases() {
+        return api('GET', '/purchases/list').then(function (data) {
+            purchases = data;
+            render();
+        });
+    }
+
+    function loadVendors() {
+        return api('GET', '/vendors/list').then(function (data) {
+            vendorsData = data.filter(function (v) { return v.status === 'active'; });
+            fillVendorSelect();
+            render();
+        });
+    }
 
     var state = { filter: 'all', search: '', sort: 'new' };
     var openId = null;
@@ -97,7 +94,7 @@
     }
 
     function avatarClass(vendor) {
-        return 'vd-av-' + ((Math.max(0, vendorList.indexOf(vendor)) % 5) + 1);
+        return 'vd-av-' + ((Math.max(0, vendorNames().indexOf(vendor)) % 5) + 1);
     }
 
     function dueNote(c) {
@@ -388,9 +385,11 @@
     // ---------- New / Edit form ----------
     var formIds = ['pfVendor', 'pfDate', 'pfDue', 'pfItems'];
 
-    $('pfVendor').innerHTML = '<option value="">Select vendor</option>' + vendorList.map(function (v) {
-        return '<option>' + esc(v) + '</option>';
-    }).join('');
+    function fillVendorSelect() {
+        $('pfVendor').innerHTML = '<option value="">Select vendor</option>' + vendorsData.map(function (v) {
+            return '<option value="' + v.id + '">' + esc(v.name) + '</option>';
+        }).join('');
+    }
 
     function addItemRow(it) {
         var row = document.createElement('div');
@@ -443,7 +442,7 @@
         $('pfTitle').textContent = p ? 'Edit ' + p.no : 'New Purchase';
         $('pfSave').textContent = p ? 'Save Changes' : 'Save Purchase';
 
-        $('pfVendor').value = p ? p.vendor : '';
+        $('pfVendor').value = p ? String(p.vendor_id) : '';
         $('pfDate').value = p ? p.date : todayStr();
         $('pfDue').value = p ? p.due : addDays(todayStr(), 30);
         $('pfNotes').value = p ? p.notes : '';
@@ -530,32 +529,31 @@
         if (itemError) { setErr('pfItems', itemError); ok = false; }
         if (!ok) { return; }
 
-        if (editingId) {
-            var p = find(editingId);
-            p.vendor = vendor;
-            p.date = date;
-            p.due = due;
-            p.items = items;
-            p.notes = $('pfNotes').value.trim();
-            toast(p.no + ' updated');
-        } else {
-            var id = purchases.reduce(function (m, x) { return Math.max(m, x.id); }, 0) + 1;
-            var no = 'PO-' + ('000' + id).slice(-4);
-            purchases.push({
-                id: id,
-                no: no,
-                vendor: vendor,
-                date: date,
-                due: due,
-                items: items,
-                notes: $('pfNotes').value.trim(),
-                payments: []
-            });
-            toast(no + ' created');
-        }
+        var data = {
+            vendor_id: vendor,
+            date: date,
+            due: due,
+            notes: $('pfNotes').value.trim(),
+            items: items
+        };
 
-        closeModal('puFormModal');
-        render();
+        if (editingId) {
+            api('PUT', '/purchases/' + editingId, data)
+                .then(function () {
+                    toast('Purchase updated');
+                    closeModal('puFormModal');
+                    loadPurchases();
+                })
+                .catch(function (e) { toast(e.message || 'Could not update purchase', 'err'); });
+        } else {
+            api('POST', '/purchases', data)
+                .then(function (res) {
+                    toast(res.no + ' created');
+                    closeModal('puFormModal');
+                    loadPurchases();
+                })
+                .catch(function (e) { toast(e.message || 'Could not save purchase', 'err'); });
+        }
     }
 
     $('puNew').addEventListener('click', function () { openForm(null); });
@@ -613,11 +611,18 @@
         if (!ok) { return; }
 
         amount = round2(amount);
-        p.payments.push({ date: date, amount: amount, method: $('ppMethod').value });
 
-        closeModal('puPayModal');
-        render();
-        toast('Payment of ' + money(amount) + ' recorded for ' + p.no);
+        api('POST', '/purchases/' + p.id + '/pay', {
+            amount: amount,
+            date: date,
+            method: $('ppMethod').value
+        })
+            .then(function () {
+                closeModal('puPayModal');
+                toast('Payment of ' + money(amount) + ' recorded for ' + p.no);
+                loadPurchases();
+            })
+            .catch(function (e) { toast(e.message || 'Could not record payment', 'err'); });
     });
 
     // ---------- Delete ----------
@@ -634,10 +639,13 @@
         var p = find(deleteId);
         if (!p) { return; }
 
-        purchases.splice(purchases.indexOf(p), 1);
-        closeModal('puConfirmModal');
-        render();
-        toast(p.no + ' deleted');
+        api('DELETE', '/purchases/' + p.id)
+            .then(function () {
+                closeModal('puConfirmModal');
+                toast(p.no + ' deleted');
+                loadPurchases();
+            })
+            .catch(function (e) { toast(e.message || 'Could not delete purchase', 'err'); });
     });
 
     // ---------- Popup band karna ----------
@@ -678,5 +686,7 @@
         render();
     });
 
-    render();
+    // ---------- Page khulte hi data mangwana ----------
+    loadVendors();
+    loadPurchases();
 })();
