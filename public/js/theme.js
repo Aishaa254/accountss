@@ -1,4 +1,8 @@
 var pending = {};
+
+// Brand settings saved in the database (sent by layout/app.blade.php)
+var BRAND = window.APP_BRAND || {};
+
 var themes = {
     emerald: ['#0f766e', '#10b981'],
     ocean: ['#1d4ed8', '#3b82f6'],
@@ -68,13 +72,15 @@ function applyFont(name) {
     document.documentElement.style.setProperty('--font', fonts[name]);
 }
 
-// ---------- Page khulte hi saved cheezein lagao ----------
-var savedCustom = localStorage.getItem('customColor');
+// ---------- Apply the saved settings as the page opens ----------
+// Theme color, font, title, footer and logo come from the database (company-wide).
+// Light / Dark mode stays in this browser, because it is a personal choice.
+var savedCustom = BRAND.customColor;
 if (savedCustom) setCustomTheme(savedCustom);
 
 applyMode(localStorage.getItem('mode') || 'light');
-applyTheme(localStorage.getItem('theme') || 'emerald');
-applyFont(localStorage.getItem('font') || 'segoe');
+applyTheme(BRAND.theme || 'emerald');
+applyFont(BRAND.font || 'segoe');
 
 // ---------- Settings page: Custom color Save button ----------
 document.addEventListener('DOMContentLoaded', function () {
@@ -102,15 +108,15 @@ document.addEventListener('DOMContentLoaded', function () {
         if (msg) { msg.textContent = 'Preview on. Click Save Changes to keep it'; msg.className = 'color-msg ok'; }
     });
 });
-// Sidebar logo: logo ho to "A" icon ki jagah dikhao
+
+// Sidebar logo: if there is a logo, show it instead of the "A" icon
 function applySidebarLogo() {
-    var data = localStorage.getItem('brandLogo');
     var img = document.getElementById('sidebarLogo');
     var icon = document.getElementById('sidebarIcon');
     if (!img || !icon) { return; }
 
-    if (data) {
-        img.src = data;
+    if (BRAND.logo) {
+        img.src = BRAND.logo;
         img.style.display = 'block';
         icon.style.display = 'none';
     } else {
@@ -121,9 +127,10 @@ function applySidebarLogo() {
 }
 
 document.addEventListener('DOMContentLoaded', applySidebarLogo);
-// Title: browser tab aur sidebar ka naam
+
+// Title: browser tab and sidebar name
 function applyTitle() {
-    var t = localStorage.getItem('appTitle');
+    var t = BRAND.title;
     if (!t) { return; }
 
     var parts = document.title.split(' - ');
@@ -134,7 +141,8 @@ function applyTitle() {
 }
 
 document.addEventListener('DOMContentLoaded', applyTitle);
-// Currency: poori site ke liye ek common function
+
+// Currency: one common function for the whole site
 var currencySymbols = { PKR: 'Rs', USD: '$', AED: 'AED', SAR: 'SAR', EUR: '€' };
 
 function appCurrency() {
@@ -165,5 +173,3 @@ function applyCurrency() {
 }
 
 document.addEventListener('DOMContentLoaded', applyCurrency);
-
-   

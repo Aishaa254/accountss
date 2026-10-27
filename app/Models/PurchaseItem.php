@@ -6,10 +6,15 @@ use Illuminate\Database\Eloquent\Model;
 
 class PurchaseItem extends Model
 {
-    protected $fillable = ['purchase_id', 'description', 'qty', 'price'];
+    protected $fillable = ['purchase_id', 'product_id', 'description', 'qty', 'price'];
 
-protected $casts = [
-    'qty' => 'float',
-    'price' => 'float',
-];
+    protected $casts = [
+        'qty' => 'float',
+        'price' => 'float',
+    ];
+
+    public function purchase()
+    {
+        return $this->belongsTo(Purchase::class);
+    }
 }

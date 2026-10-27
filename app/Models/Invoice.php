@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Invoice extends Model
 {
+    use \App\Models\Concerns\Auditable;
     protected $fillable = ['no', 'customer_id', 'date', 'due', 'discount', 'tax'];
 
 protected $casts = [

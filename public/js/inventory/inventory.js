@@ -6,6 +6,7 @@
     function todayStr() { return toStr(new Date()); }
     function parse(s) { var p = s.split('-'); return new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])); }
     function fmtDate(s) { return parse(s).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }); }
+    function daysBetween(a, b) { return Math.round((parse(b) - parse(a)) / 86400000); }
     function money(n) { return formatMoney(Math.round(n * 100) / 100); }
     function num(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
     function sum(list, fn) { return list.reduce(function (s, x) { return s + fn(x); }, 0); }
@@ -36,14 +37,37 @@
         });
     }
 
+    // ---------- Which page are we on? ----------
+    var params = new URLSearchParams(window.location.search);
+    var urlFilter = params.get('filter');
+    var view = urlFilter === 'attention' ? 'low' : (urlFilter === 'slow' ? 'slow' : 'all');
+
+    var titles = {
+        all: ['Inventory', 'Know what you have, what is selling, and what to order next.'],
+        low: ['Low Stock', 'Pick what to buy, set the quantity, and send the list to your supplier in one click.'],
+        slow: ['Slow Moving', 'Money sitting on the shelf. Clear it before it costs you more.']
+    };
+
+    function setupView() {
+        $('ivPage').className = 'iv-view-' + view;
+        $('ivTitle').textContent = titles[view][0];
+        $('ivSub').textContent = titles[view][1];
+        $('viewAll').style.display = view === 'all' ? '' : 'none';
+        $('viewLow').style.display = view === 'low' ? '' : 'none';
+        $('viewSlow').style.display = view === 'slow' ? '' : 'none';
+        document.title = titles[view][0] + ' - AccountPro';
+    }
+
     // ---------- State ----------
     var products = [];
-    var state = { filter: 'all', search: '', category: 'all', sort: 'name' };
+    var state = { filter: 'all', search: '', category: 'all', sort: 'name', layout: localStorage.getItem('ivLayout') || 'grid' };
     var openId = null;
     var current = null;
     var editingId = null;
     var adjustId = null;
     var deleteId = null;
+    var plan = {};
+    var disc = 20;
 
     function find(id) {
         return products.filter(function (p) { return p.id === id; })[0];
@@ -65,6 +89,7 @@
     // ---------- Small calculations ----------
     function margin(p) { return p.sale > 0 ? Math.round(((p.sale - p.cost) / p.sale) * 100) : 0; }
     function stockValue(p) { return Math.max(p.stock, 0) * p.cost; }
+    function avatarOf(p) { return 'vd-av-' + (((p.id - 1) % 5) + 1); }
 
     function statusBadge(p) {
         if (!p.active) { return '<span class="vd-badge vd-badge-inactive">Inactive</span>'; }
@@ -76,6 +101,11 @@
         if (p.stock <= 0) { return 'Out of stock'; }
         if (p.daysLeft !== null) { return 'About ' + p.daysLeft + ' days left'; }
         return 'No sales in 30 days';
+    }
+
+    function gaugeWidth(p) {
+        if (p.reorder > 0) { return Math.max(0, Math.min(100, Math.round((p.stock / (p.reorder * 3)) * 100))); }
+        return p.stock > 0 ? 100 : 0;
     }
 
     function toast(message, type) {
@@ -98,19 +128,23 @@
 
     function clearErrs(ids) { ids.forEach(function (id) { setErr(id, ''); }); }
 
-    // ---------- Cards ----------
+    function active() { return products.filter(function (p) { return p.active; }); }
+
+    // =====================================================
+    //  VIEW 1: ALL PRODUCTS (Catalog)
+    // =====================================================
     function renderCards() {
-        var active = products.filter(function (p) { return p.active; });
-        var stocked = active.filter(function (p) { return p.stock > 0; });
+        var act = active();
+        var stocked = act.filter(function (p) { return p.stock > 0; });
         var costValue = sum(stocked, function (p) { return p.stock * p.cost; });
         var saleValue = sum(stocked, function (p) { return p.stock * p.sale; });
-        var lowList = active.filter(function (p) { return p.status === 'low' || p.status === 'out'; });
-        var outList = active.filter(function (p) { return p.status === 'out'; });
-        var slow = active.filter(function (p) { return p.dead; });
+        var lowList = act.filter(function (p) { return p.status === 'low' || p.status === 'out'; });
+        var outList = act.filter(function (p) { return p.status === 'out'; });
+        var slow = act.filter(function (p) { return p.dead; });
         var slowValue = sum(slow, function (p) { return p.stock * p.cost; });
 
         $('ivCardCount').textContent = products.length;
-        $('ivCardCountNote').textContent = active.length + ' active';
+        $('ivCardCountNote').textContent = act.length + ' active';
         $('ivCardValue').textContent = money(costValue);
         $('ivCardValueNote').textContent = 'Worth ' + money(saleValue) + ' when sold';
         $('ivCardLow').textContent = lowList.length;
@@ -119,44 +153,69 @@
         $('ivCardSlowNote').textContent = slow.length + ' product(s) not sold in 60 days';
     }
 
-    // ---------- Insights ----------
+    function renderHealth() {
+        var act = active();
+        var total = act.length;
+
+        if (!total) {
+            $('ivHealthBar').innerHTML = '';
+            $('ivHealthLegend').innerHTML = 'Add products to see how healthy your stock is.';
+            return;
+        }
+
+        var parts = [
+            { cls: 'iv-h-in', label: 'In stock', n: act.filter(function (p) { return p.status === 'in'; }).length },
+            { cls: 'iv-h-low', label: 'Low', n: act.filter(function (p) { return p.status === 'low'; }).length },
+            { cls: 'iv-h-out', label: 'Out', n: act.filter(function (p) { return p.status === 'out'; }).length }
+        ];
+
+        $('ivHealthBar').innerHTML = parts.map(function (x) {
+            return '<span class="' + x.cls + '" style="width:' + (x.n / total * 100) + '%"></span>';
+        }).join('');
+
+        $('ivHealthLegend').innerHTML = parts.map(function (x) {
+            return '<span><i class="' + x.cls + '"></i>' + x.label + ': ' + x.n + ' (' + Math.round(x.n / total * 100) + '%)</span>';
+        }).join('');
+    }
+
     function insightRows(list, rowFn, emptyText) {
         return list.length ? list.map(rowFn).join('') : '<div class="iv-empty">' + esc(emptyText) + '</div>';
     }
 
     function renderInsights() {
-        var active = products.filter(function (p) { return p.active; });
+        var act = active();
 
-        var best = active.filter(function (p) { return p.revenue > 0; })
+        var best = act.filter(function (p) { return p.revenue > 0; })
             .sort(function (a, b) { return b.revenue - a.revenue; }).slice(0, 5);
 
         $('ivBest').innerHTML = insightRows(best, function (p) {
             return '<div class="iv-row"><div>' + esc(p.name) + '<small>' + num(p.sold) + ' ' + esc(p.unit) + ' sold</small></div>' +
                 '<b>' + money(p.revenue) + '</b></div>';
-        }, 'No sales yet. Link products in invoices to see this.');
+        }, 'No sales yet. Pick products when you make invoices.');
 
-        var reorder = active.filter(function (p) { return p.suggest > 0; })
-            .sort(function (a, b) {
-                if ((a.status === 'out') !== (b.status === 'out')) { return a.status === 'out' ? -1 : 1; }
-                return (a.daysLeft === null ? 9999 : a.daysLeft) - (b.daysLeft === null ? 9999 : b.daysLeft);
-            }).slice(0, 5);
+        var profitable = act.map(function (p) { return { p: p, profit: p.revenue - p.sold * p.cost }; })
+            .filter(function (x) { return x.profit > 0; })
+            .sort(function (a, b) { return b.profit - a.profit; }).slice(0, 5);
 
-        $('ivReorder').innerHTML = insightRows(reorder, function (p) {
-            return '<div class="iv-row"><div>' + esc(p.name) + '<small>' + esc(daysText(p)) + '</small></div>' +
-                '<b>Order ' + num(p.suggest) + ' ' + esc(p.unit) + '</b></div>';
-        }, 'Nothing to reorder right now.');
+        $('ivProfit').innerHTML = insightRows(profitable, function (x) {
+            return '<div class="iv-row"><div>' + esc(x.p.name) + '<small>' + margin(x.p) + '% margin</small></div>' +
+                '<b>' + money(x.profit) + '</b></div>';
+        }, 'Profit shows up after your first sale.');
 
-        var slow = active.filter(function (p) { return p.dead; })
-            .sort(function (a, b) { return b.stock * b.cost - a.stock * a.cost; }).slice(0, 5);
+        var cats = {};
+        act.forEach(function (p) { cats[p.category] = (cats[p.category] || 0) + stockValue(p); });
+        var catList = Object.keys(cats).map(function (k) { return { name: k, value: cats[k] }; })
+            .filter(function (c) { return c.value > 0; })
+            .sort(function (a, b) { return b.value - a.value; }).slice(0, 5);
+        var maxCat = catList.length ? catList[0].value : 1;
 
-        $('ivSlow').innerHTML = insightRows(slow, function (p) {
-            return '<div class="iv-row"><div>' + esc(p.name) + '<small>' +
-                (p.lastSold ? 'Last sold ' + fmtDate(p.lastSold) : 'Never sold') + '</small></div>' +
-                '<b>' + money(p.stock * p.cost) + '</b></div>';
-        }, 'No slow stock. Everything is moving.');
+        $('ivCats').innerHTML = insightRows(catList, function (c) {
+            return '<div class="iv-row" style="display:block"><div style="display:flex;justify-content:space-between"><span>' +
+                esc(c.name) + '</span><b>' + money(c.value) + '</b></div>' +
+                '<div class="iv-mini-track"><span style="width:' + Math.round((c.value / maxCat) * 100) + '%"></span></div></div>';
+        }, 'Add products with stock to see this.');
     }
 
-    // ---------- Product list ----------
     function fillCategories() {
         var cats = {};
         products.forEach(function (p) { cats[p.category] = true; });
@@ -176,7 +235,6 @@
 
     function matchesFilter(p) {
         if (state.filter === 'inactive') { return !p.active; }
-        if (state.filter === 'attention') { return p.active && p.status !== 'in'; }
         if (state.filter === 'all') { return true; }
         if (!p.active) { return false; }
         if (state.filter === 'slow') { return p.dead; }
@@ -203,50 +261,353 @@
         return list;
     }
 
-    function rowHtml(p) {
-        var width = p.reorder > 0
-            ? Math.min(100, Math.round((p.stock / (p.reorder * 3)) * 100))
-            : (p.stock > 0 ? 100 : 0);
-        var risky = p.status !== 'in';
-        var avatar = 'vd-av-' + (((p.id - 1) % 5) + 1);
+    function dotsButton(p) {
+        return '<button type="button" class="vd-dots" data-id="' + p.id + '"><i class="fa-solid fa-ellipsis-vertical"></i></button>';
+    }
 
-        return '<tr>' +
+    function rowHtml(p) {
+        var risky = p.status !== 'in';
+
+        return '<tr data-id="' + p.id + '">' +
             '<td><div class="vd-vendor">' +
-                '<span class="vd-avatar ' + avatar + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                '<span class="vd-avatar ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
                 '<div><div class="vd-name">' + esc(p.name) + (p.dead && p.active ? '<span class="iv-slow-tag">Slow</span>' : '') + '</div>' +
                 '<div class="vd-company">' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</div></div>' +
             '</div></td>' +
             '<td><div class="vd-amount' + (p.stock <= 0 ? ' vd-red' : '') + '">' + num(p.stock) + ' ' + esc(p.unit) + '</div>' +
-                '<div class="vd-bar' + (risky ? ' vd-bar-red' : '') + '"><span style="width:' + Math.max(0, width) + '%"></span></div>' +
+                '<div class="vd-bar' + (risky ? ' vd-bar-red' : '') + '"><span style="width:' + gaugeWidth(p) + '%"></span></div>' +
                 '<div class="vd-bar-note">' + esc(daysText(p)) + '</div></td>' +
             '<td><div class="vd-amount">' + money(p.sale) + '</div>' +
                 '<div class="vd-bar-note">Cost ' + money(p.cost) + ' - ' + margin(p) + '% margin</div></td>' +
             '<td>' + money(stockValue(p)) + '</td>' +
             '<td>' + statusBadge(p) + '</td>' +
-            '<td class="vd-actions"><button type="button" class="vd-dots" data-id="' + p.id + '"><i class="fa-solid fa-ellipsis-vertical"></i></button></td>' +
+            '<td class="vd-actions">' + dotsButton(p) + '</td>' +
         '</tr>';
     }
 
+    function cardHtml(p) {
+        var risky = p.status !== 'in';
+
+        return '<div class="iv-card" data-id="' + p.id + '">' +
+            '<div class="iv-card-top">' +
+                '<span class="vd-avatar ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                '<div class="iv-card-name"><b>' + esc(p.name) + '</b><small>' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</small></div>' +
+                dotsButton(p) +
+            '</div>' +
+            '<div class="iv-card-stock"><strong' + (p.stock <= 0 ? ' class="vd-red"' : '') + '>' + num(p.stock) + '<small>' + esc(p.unit) + '</small></strong>' + statusBadge(p) + '</div>' +
+            '<div class="vd-bar' + (risky ? ' vd-bar-red' : '') + '"><span style="width:' + gaugeWidth(p) + '%"></span></div>' +
+            '<div class="iv-card-meta">' +
+                '<div>Sale price<b class="t">' + money(p.sale) + '</b></div>' +
+                '<div>Margin<b class="t">' + margin(p) + '%</b></div>' +
+                '<div>Cost<b class="t">' + money(p.cost) + '</b></div>' +
+                '<div>Stock value<b class="t">' + money(stockValue(p)) + '</b></div>' +
+            '</div>' +
+            '<div class="iv-card-foot">' + esc(daysText(p)) + (p.dead && p.active ? ' - slow moving' : '') + '</div>' +
+        '</div>';
+    }
+
     function renderChips() {
-        var active = products.filter(function (p) { return p.active; });
+        var act = active();
         $('ivcAll').textContent = products.length;
-        $('ivcIn').textContent = active.filter(function (p) { return p.status === 'in'; }).length;
-        $('ivcLow').textContent = active.filter(function (p) { return p.status === 'low'; }).length;
-        $('ivcOut').textContent = active.filter(function (p) { return p.status === 'out'; }).length;
-        $('ivcSlow').textContent = active.filter(function (p) { return p.dead; }).length;
+        $('ivcIn').textContent = act.filter(function (p) { return p.status === 'in'; }).length;
+        $('ivcLow').textContent = act.filter(function (p) { return p.status === 'low'; }).length;
+        $('ivcOut').textContent = act.filter(function (p) { return p.status === 'out'; }).length;
+        $('ivcSlow').textContent = act.filter(function (p) { return p.dead; }).length;
         $('ivcInactive').textContent = products.filter(function (p) { return !p.active; }).length;
     }
 
-    function render() {
+    function renderList() {
         var list = getVisible();
+        var grid = state.layout === 'grid';
 
-        $('ivRows').innerHTML = list.length
-            ? list.map(rowHtml).join('')
-            : '<tr class="vd-empty"><td colspan="6"><i class="fa-regular fa-folder-open"></i>No products found</td></tr>';
+        $('ivGrid').style.display = grid ? '' : 'none';
+        $('ivTableWrap').style.display = grid ? 'none' : '';
+        document.querySelectorAll('#ivLayout button').forEach(function (b) {
+            b.classList.toggle('active', b.getAttribute('data-layout') === state.layout);
+        });
 
+        if (grid) {
+            $('ivGrid').innerHTML = list.length
+                ? list.map(cardHtml).join('')
+                : '<div class="iv-empty-big"><i class="fa-regular fa-folder-open"></i>No products found</div>';
+        } else {
+            $('ivRows').innerHTML = list.length
+                ? list.map(rowHtml).join('')
+                : '<tr class="vd-empty"><td colspan="6"><i class="fa-regular fa-folder-open"></i>No products found</td></tr>';
+        }
+    }
+
+    function renderAll() {
         renderCards();
+        renderHealth();
         renderInsights();
         renderChips();
+        renderList();
+    }
+
+    // =====================================================
+    //  VIEW 2: LOW STOCK (Reorder Planner)
+    // =====================================================
+    function plannerItems() {
+        return active().filter(function (p) { return p.status !== 'in' || p.suggest > 0; });
+    }
+
+    function defaultQty(p) {
+        return p.suggest > 0 ? p.suggest : Math.max(Math.ceil(p.reorder * 2 - p.stock), 1);
+    }
+
+    function planRowHtml(p) {
+        var e = plan[p.id];
+
+        return '<div class="iv-plan-row' + (e.on ? '' : ' off') + '" data-id="' + p.id + '">' +
+            '<label class="iv-check"><input type="checkbox" class="pl-on"' + (e.on ? ' checked' : '') + '></label>' +
+            '<div class="iv-plan-main"><b>' + esc(p.name) + '</b><small>' + esc(p.category) + ' - ' + esc(daysText(p)) + '</small></div>' +
+            '<div class="iv-plan-gauge"><div class="vd-bar vd-bar-red"><span style="width:' + gaugeWidth(p) + '%"></span></div>' +
+                '<small>' + num(p.stock) + ' ' + esc(p.unit) + ' left' + (p.reorder ? ' (reorder at ' + num(p.reorder) + ')' : '') + '</small></div>' +
+            '<div class="iv-plan-qty"><input type="number" class="pl-qty" min="0" step="any" value="' + e.qty + '"><span>' + esc(p.unit) + '</span></div>' +
+            '<div class="iv-plan-cost">' + num(e.qty) + ' x ' + money(p.cost) + '<b class="pl-line">' + money(e.qty * p.cost) + '</b></div>' +
+        '</div>';
+    }
+
+    function renderLow() {
+        var items = plannerItems();
+
+        items.forEach(function (p) {
+            if (!plan[p.id]) { plan[p.id] = { on: true, qty: defaultQty(p) }; }
+        });
+
+        function byUrgency(a, b) {
+            var da = a.daysLeft === null ? 9999 : a.daysLeft;
+            var db = b.daysLeft === null ? 9999 : b.daysLeft;
+            return da - db || a.name.localeCompare(b.name);
+        }
+
+        var groups = [
+            { key: 'out', title: 'Out of stock', icon: 'fa-circle-xmark',
+              list: items.filter(function (p) { return p.status === 'out'; }) },
+            { key: 'urgent', title: 'Running out within 7 days', icon: 'fa-bolt',
+              list: items.filter(function (p) { return p.status !== 'out' && p.daysLeft !== null && p.daysLeft <= 7; }) },
+            { key: 'low', title: 'Low stock', icon: 'fa-triangle-exclamation',
+              list: items.filter(function (p) { return p.status !== 'out' && !(p.daysLeft !== null && p.daysLeft <= 7); }) }
+        ];
+
+        if (!items.length) {
+            $('ivPlanner').innerHTML = '<div class="iv-empty-big"><i class="fa-regular fa-circle-check"></i>All stocked up! Nothing needs reordering right now.</div>';
+            $('ivPlanBar').style.display = 'none';
+        } else {
+            $('ivPlanBar').style.display = '';
+            $('ivPlanner').innerHTML = groups.filter(function (g) { return g.list.length; }).map(function (g) {
+                return '<div class="iv-group iv-group-' + g.key + '">' +
+                    '<h3 class="iv-group-title"><i class="fa-solid ' + g.icon + '"></i>' + g.title + '<span>' + g.list.length + '</span></h3>' +
+                    g.list.sort(byUrgency).map(planRowHtml).join('') +
+                '</div>';
+            }).join('');
+        }
+
+        $('lowCount').textContent = items.length;
+        $('lowOut').textContent = items.filter(function (p) { return p.status === 'out'; }).length;
+        updatePlanTotals();
+    }
+
+    function selectedPlan() {
+        return plannerItems().filter(function (p) { return plan[p.id] && plan[p.id].on && plan[p.id].qty > 0; });
+    }
+
+    function updatePlanTotals() {
+        var chosen = selectedPlan();
+        var total = sum(chosen, function (p) { return plan[p.id].qty * p.cost; });
+
+        $('planSel').textContent = chosen.length;
+        $('planTotal').textContent = money(total);
+        $('lowBudget').textContent = money(total);
+        $('ivLowSummary').textContent = plannerItems().length
+            ? plannerItems().length + ' product(s) need attention. Ordering your selection costs about ' + money(total) + '.'
+            : 'Everything is well stocked. Check back after your next sales.';
+    }
+
+    $('ivPlanner').addEventListener('input', function (e) {
+        var row = e.target.closest('.iv-plan-row');
+        if (!row || !e.target.classList.contains('pl-qty')) { return; }
+
+        var p = find(Number(row.getAttribute('data-id')));
+        var qty = Math.max(0, parseFloat(e.target.value) || 0);
+        plan[p.id].qty = qty;
+
+        row.querySelector('.iv-plan-cost').innerHTML = num(qty) + ' x ' + money(p.cost) + '<b class="pl-line">' + money(qty * p.cost) + '</b>';
+        updatePlanTotals();
+    });
+
+    $('ivPlanner').addEventListener('change', function (e) {
+        var row = e.target.closest('.iv-plan-row');
+        if (!row || !e.target.classList.contains('pl-on')) { return; }
+
+        var id = Number(row.getAttribute('data-id'));
+        plan[id].on = e.target.checked;
+        row.classList.toggle('off', !e.target.checked);
+        updatePlanTotals();
+    });
+
+    function planText() {
+        var lines = selectedPlan().map(function (p, i) {
+            return (i + 1) + '. ' + p.name + ' - ' + num(plan[p.id].qty) + ' ' + p.unit;
+        });
+        return 'Order request (' + fmtDate(todayStr()) + ')\n\n' + lines.join('\n') + '\n\nPlease confirm price and delivery time. Thank you.';
+    }
+
+    function copyText(text) {
+        if (navigator.clipboard && window.isSecureContext) {
+            return navigator.clipboard.writeText(text);
+        }
+
+        return new Promise(function (resolve) {
+            var area = document.createElement('textarea');
+            area.value = text;
+            document.body.appendChild(area);
+            area.select();
+            document.execCommand('copy');
+            document.body.removeChild(area);
+            resolve();
+        });
+    }
+
+    $('planCopy').addEventListener('click', function () {
+        if (!selectedPlan().length) { toast('Select at least one product', 'err'); return; }
+        copyText(planText()).then(function () { toast('Order list copied. Paste it in WhatsApp.'); });
+    });
+
+    $('planCsv').addEventListener('click', function () {
+        var chosen = selectedPlan();
+        if (!chosen.length) { toast('Select at least one product', 'err'); return; }
+
+        var rows = [['Product', 'Unit', 'Current stock', 'Order quantity', 'Cost price', 'Line total']];
+        chosen.forEach(function (p) {
+            rows.push([p.name, p.unit, p.stock, plan[p.id].qty, p.cost, plan[p.id].qty * p.cost]);
+        });
+
+        var text = rows.map(function (r) {
+            return r.map(function (v) { return '"' + String(v).replace(/"/g, '""') + '"'; }).join(',');
+        }).join('\n');
+
+        var a = document.createElement('a');
+        a.href = URL.createObjectURL(new Blob([text], { type: 'text/csv;charset=utf-8;' }));
+        a.download = 'reorder-list-' + todayStr() + '.csv';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    });
+
+    $('planDraft').addEventListener('click', function () {
+        var chosen = selectedPlan();
+        if (!chosen.length) { toast('Select at least one product', 'err'); return; }
+
+        sessionStorage.setItem('purchaseDraft', JSON.stringify(chosen.map(function (p) {
+            return { product_id: p.id, desc: p.name, qty: plan[p.id].qty, price: p.cost };
+        })));
+
+        window.location.href = '/purchases?draft=1';
+    });
+
+    // =====================================================
+    //  VIEW 3: SLOW MOVING (Dead stock)
+    // =====================================================
+    function clearPrice(p) { return Math.round(p.sale * (1 - disc / 100)); }
+    function idleDays(p) { return Math.max(daysBetween(p.idleSince, todayStr()), 0); }
+
+    function renderSlow() {
+        var items = active().filter(function (p) { return p.dead; })
+            .sort(function (a, b) { return stockValue(b) - stockValue(a); });
+
+        var stuck = sum(items, function (p) { return p.stock * p.cost; });
+        var recover = sum(items, function (p) { return p.stock * clearPrice(p); });
+
+        $('slowCount').textContent = items.length;
+        $('slowStuck').textContent = money(stuck);
+        $('slowRecover').textContent = money(recover);
+        $('ivSlowSummary').textContent = items.length
+            ? money(stuck) + ' is tied up in ' + items.length + ' product(s) that have not sold for 60+ days. At ' + disc + '% off you would get back ' + money(recover) + '.'
+            : 'Nothing is stuck. Every product is moving.';
+
+        document.querySelectorAll('#ivDisc button').forEach(function (b) {
+            b.classList.toggle('active', Number(b.getAttribute('data-disc')) === disc);
+        });
+
+        // Age buckets
+        var buckets = [
+            { label: '60 - 90 days', min: 60, max: 90 },
+            { label: '91 - 180 days', min: 91, max: 180 },
+            { label: '181+ days', min: 181, max: 99999 }
+        ].map(function (b) {
+            var list = items.filter(function (p) { var d = idleDays(p); return d >= b.min && d <= b.max; });
+            return { label: b.label, count: list.length, value: sum(list, function (p) { return p.stock * p.cost; }) };
+        });
+        var maxBucket = Math.max.apply(null, buckets.map(function (b) { return b.value; })) || 1;
+
+        $('ivAging').innerHTML = items.length ? buckets.map(function (b) {
+            return '<div class="iv-bucket"><span>' + b.label + '</span>' +
+                '<div class="iv-mini-track"><span style="width:' + Math.round((b.value / maxBucket) * 100) + '%"></span></div>' +
+                '<b>' + money(b.value) + ' <small>(' + b.count + ')</small></b></div>';
+        }).join('') : '';
+
+        // Cards
+        if (!items.length) {
+            $('ivSlowList').innerHTML = '<div class="iv-empty-big"><i class="fa-regular fa-face-smile"></i>Great news! No slow moving stock.</div>';
+            return;
+        }
+
+        $('ivSlowList').innerHTML = items.map(function (p) {
+            var days = idleDays(p);
+            var price = clearPrice(p);
+            var below = price < p.cost;
+
+            return '<div class="iv-slow-card" data-id="' + p.id + '">' +
+                '<div class="iv-slow-main"><b>' + esc(p.name) + '</b>' +
+                    '<small>' + esc(p.category) + ' - ' + (p.lastSold ? 'Last sold ' + fmtDate(p.lastSold) : 'Never sold') + '</small>' +
+                    '<span class="iv-idle' + (days > 120 ? ' hot' : '') + '">' + days + ' days idle</span></div>' +
+                '<div class="iv-slow-nums">' +
+                    '<div>In stock<b>' + num(p.stock) + ' ' + esc(p.unit) + '</b></div>' +
+                    '<div>Money stuck<b>' + money(p.stock * p.cost) + '</b></div>' +
+                    '<div>Sell at (-' + disc + '%)<b>' + money(price) + '</b>' + (below ? '<span class="warn">below cost</span>' : '') + '</div>' +
+                    '<div>You get back<b>' + money(p.stock * price) + '</b></div>' +
+                '</div>' +
+                '<div class="iv-slow-actions">' +
+                    '<button type="button" data-act="edit"><i class="fa-regular fa-pen-to-square"></i> Edit price</button>' +
+                    '<button type="button" data-act="adjust"><i class="fa-solid fa-sliders"></i> Write off</button>' +
+                    '<button type="button" data-act="toggle"><i class="fa-solid fa-eye-slash"></i> Make inactive</button>' +
+                '</div>' +
+            '</div>';
+        }).join('');
+    }
+
+    $('ivDisc').addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) { return; }
+        disc = Number(b.getAttribute('data-disc'));
+        renderSlow();
+    });
+
+    $('ivSlowList').addEventListener('click', function (e) {
+        var card = e.target.closest('.iv-slow-card');
+        if (!card) { return; }
+
+        var p = find(Number(card.getAttribute('data-id')));
+        if (!p) { return; }
+
+        var btn = e.target.closest('[data-act]');
+        if (!btn) { openDetail(p); return; }
+
+        var act = btn.getAttribute('data-act');
+        if (act === 'edit') { openForm(p); }
+        else if (act === 'adjust') { openAdjust(p); }
+        else if (act === 'toggle') { toggleActive(p); }
+    });
+
+    // =====================================================
+    //  Render dispatcher
+    // =====================================================
+    function render() {
+        if (view === 'low') { renderLow(); }
+        else if (view === 'slow') { renderSlow(); }
+        else { renderAll(); }
     }
 
     // ---------- Three dots menu ----------
@@ -286,7 +647,17 @@
         menu.style.left = left + 'px';
     }
 
-    $('ivRows').addEventListener('click', function (e) {
+    function toggleActive(p) {
+        var next = !p.active;
+        api('PUT', '/inventory/' + p.id, { active: next })
+            .then(function () {
+                toast(next ? 'Product is active' : 'Product is inactive');
+                loadProducts();
+            })
+            .catch(function (err) { toast(err.message || 'Could not change status', 'err'); });
+    }
+
+    function handleListClick(e) {
         var btn = e.target.closest('.vd-dots');
 
         if (btn) {
@@ -296,12 +667,14 @@
             return;
         }
 
-        var row = e.target.closest('tr');
-        var dots = row && row.querySelector('.vd-dots');
-        if (!dots) { return; }
-        var p = find(Number(dots.getAttribute('data-id')));
+        var holder = e.target.closest('[data-id]');
+        if (!holder) { return; }
+        var p = find(Number(holder.getAttribute('data-id')));
         if (p) { openDetail(p); }
-    });
+    }
+
+    $('ivRows').addEventListener('click', handleListClick);
+    $('ivGrid').addEventListener('click', handleListClick);
 
     menu.addEventListener('click', function (e) {
         var el = e.target.closest('.vd-menu-item');
@@ -316,15 +689,7 @@
         else if (action === 'adjust') { openAdjust(p); }
         else if (action === 'edit') { openForm(p); }
         else if (action === 'delete') { askDelete(p); }
-        else if (action === 'toggle') {
-            var next = !p.active;
-            api('PUT', '/inventory/' + p.id, { active: next })
-                .then(function () {
-                    toast(next ? 'Product is active' : 'Product is inactive');
-                    loadProducts();
-                })
-                .catch(function (err) { toast(err.message || 'Could not change status', 'err'); });
-        }
+        else if (action === 'toggle') { toggleActive(p); }
     });
 
     document.addEventListener('click', function (e) {
@@ -350,11 +715,9 @@
     }
 
     function panelHtml(p) {
-        var avatar = 'vd-av-' + (((p.id - 1) % 5) + 1);
-
         return '' +
             '<div class="vd-profile">' +
-                '<span class="vd-avatar vd-avatar-lg ' + avatar + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                '<span class="vd-avatar vd-avatar-lg ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
                 '<div>' +
                     '<div class="vd-profile-name">' + esc(p.name) + '</div>' +
                     '<div class="vd-company">' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</div>' +
@@ -620,10 +983,10 @@
         closeDetail();
     });
 
-    // ---------- Search, filters, sort ----------
+    // ---------- Search, filters, sort, layout ----------
     $('ivSearch').addEventListener('input', function () {
         state.search = this.value;
-        render();
+        renderList();
     });
 
     $('ivChips').addEventListener('click', function (e) {
@@ -633,28 +996,36 @@
         document.querySelectorAll('#ivChips .vd-chip').forEach(function (c) { c.classList.remove('active'); });
         chip.classList.add('active');
         state.filter = chip.getAttribute('data-filter');
-        render();
+        renderList();
     });
 
     $('ivCat').addEventListener('change', function () {
         state.category = this.value;
-        render();
+        renderList();
     });
 
     $('ivSort').addEventListener('change', function () {
         state.sort = this.value;
-        render();
+        renderList();
     });
-    // Open with a filter when coming from the sidebar links
-    var urlFilter = new URLSearchParams(window.location.search).get('filter');
-    var allowedFilters = ['in', 'low', 'out', 'slow', 'inactive', 'attention'];
 
-    if (urlFilter && allowedFilters.indexOf(urlFilter) !== -1) {
+    $('ivLayout').addEventListener('click', function (e) {
+        var b = e.target.closest('button');
+        if (!b) { return; }
+        state.layout = b.getAttribute('data-layout');
+        localStorage.setItem('ivLayout', state.layout);
+        renderList();
+    });
+
+    // ---------- Start ----------
+    var chipFilters = ['in', 'low', 'out', 'inactive'];
+    if (view === 'all' && urlFilter && chipFilters.indexOf(urlFilter) !== -1) {
         state.filter = urlFilter;
         document.querySelectorAll('#ivChips .vd-chip').forEach(function (c) {
             c.classList.toggle('active', c.getAttribute('data-filter') === urlFilter);
         });
     }
-    // ---------- Load data ----------
+
+    setupView();
     loadProducts();
 })();

@@ -1,0 +1,53 @@
+.us-roles {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+    gap: 14px;
+    margin-bottom: 20px;
+}
+
+.us-role {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 14px 16px;
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.us-role:hover { transform: translateY(-3px); box-shadow: 0 12px 26px rgba(15, 23, 42, 0.1); border-color: var(--main); }
+.us-role b { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+.us-role p { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
+
+.us-badge {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 600;
+}
+.us-badge-owner { background: rgba(245, 158, 11, 0.18); color: #d97706; }
+.us-badge-accountant { background: rgba(59, 130, 246, 0.15); color: #2563eb; }
+.us-badge-manager { background: rgba(139, 92, 246, 0.16); color: #7c3aed; }
+.us-badge-staff { background: rgba(148, 163, 184, 0.2); color: var(--muted); }
+
+.us-me {
+    display: inline-block;
+    margin-left: 6px;
+    padding: 1px 7px;
+    border-radius: 999px;
+    font-size: 11px;
+    background: color-mix(in srgb, var(--main) 15%, transparent);
+    color: var(--main);
+}
+
+.us-actions { display: flex; gap: 6px; justify-content: flex-end; }
+.us-act {
+    width: 34px;
+    height: 34px;
+    border: none;
+    border-radius: 9px;
+    background: var(--hover);
+    color: var(--muted);
+    cursor: pointer;
+    transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease;
+}
+.us-act:hover { transform: translateY(-2px) scale(1.08); background: color-mix(in srgb, var(--main) 14%, var(--card)); color: var(--main); }
+.us-act.danger:hover { background: rgba(239, 68, 68, 0.14); color: #ef4444; }

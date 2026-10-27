@@ -1,7 +1,7 @@
-// ---------- Company ki details (ye baad mein Company Settings se aayengi) ----------
+// ---------- Company details (filled from Company Settings) ----------
 var COMPANY = { name: 'Your Company', address: 'Company address', phone: '0300 0000000' };
 
-// ---------- Chhote helper functions ----------
+// ---------- Small helper functions ----------
 function $(id) { return document.getElementById(id); }
 
 function esc(text) {
@@ -10,6 +10,7 @@ function esc(text) {
     });
 }
 function money(n) { return formatMoney(Math.round(n)); }
+function num(n) { return Number(n).toLocaleString('en-US', { maximumFractionDigits: 2 }); }
 
 function iso(offset) {
     var d = new Date();
@@ -31,7 +32,7 @@ function toast(msg, type) {
     setTimeout(function () { t.classList.remove('show'); }, 2600);
 }
 
-// Field ke neeche laal message dikhana ya hatana
+// Show or clear the red message under a field
 function setErr(id, msg) {
     var el = document.querySelector('[data-err="' + id + '"]');
     if (el) { el.textContent = msg || ''; }
@@ -39,7 +40,7 @@ function setErr(id, msg) {
     if (input) { input.classList.toggle('is-invalid', !!msg); }
 }
 
-// ---------- Laravel se baat karne wala helper ----------
+// ---------- Talking to Laravel ----------
 function api(method, url, body) {
     return fetch(url, {
         method: method,
@@ -66,9 +67,10 @@ function firstError(e) {
     return keys.length ? e.errors[keys[0]][0] : e.message;
 }
 
-// ---------- Data (ab database se aata hai) ----------
+// ---------- Data (comes from the database) ----------
 var invoices = [];
 var customersList = [];
+var productsList = [];
 
 var currentFilter = 'all';
 var viewNo = null;
@@ -88,6 +90,7 @@ function loadCustomers() {
         customersList = data.filter(function (c) { return c.active; });
     });
 }
+
 function loadCompany() {
     return api('GET', '/company/info').then(function (data) {
         COMPANY.name = data.name || COMPANY.name;
@@ -96,7 +99,54 @@ function loadCompany() {
     });
 }
 
-// ---------- Hisaab kitaab ----------
+// ---------- Products (for the item picker) ----------
+function loadProducts() {
+    return api('GET', '/inventory/options').then(function (data) {
+        productsList = data;
+        $('inv-products').innerHTML = data.map(function (p) {
+            return '<option value="' + esc(p.name) + '" label="' + esc(num(p.stock) + ' ' + p.unit + ' in stock') + '"></option>';
+        }).join('');
+    });
+}
+
+function productByName(name) {
+    var n = name.trim().toLowerCase();
+    if (!n) return null;
+    return productsList.filter(function (p) { return p.name.toLowerCase() === n; })[0] || null;
+}
+
+function syncRow(row, nameChanged) {
+    var priceEl = row.querySelector('.it-price');
+    var hint = row.querySelector('.it-stock');
+    var p = productByName(row.querySelector('.it-name').value);
+
+    if (!p) {
+        delete row.dataset.product;
+        hint.textContent = '';
+        hint.className = 'it-stock';
+        return;
+    }
+
+    row.dataset.product = p.id;
+
+    if (nameChanged && (priceEl.value.trim() === '' || priceEl.value === row.dataset.auto)) {
+        priceEl.value = p.sale;
+        row.dataset.auto = String(p.sale);
+    }
+
+    var qty = parseFloat(row.querySelector('.it-qty').value) || 0;
+    var price = parseFloat(priceEl.value);
+    var text = num(p.stock) + ' ' + p.unit + ' in stock';
+    var warn = false;
+
+    if (qty > p.stock) { text = 'Only ' + num(p.stock) + ' ' + p.unit + ' in stock'; warn = true; }
+    if (!isNaN(price) && price < p.cost) { text += ' - price is below cost (' + money(p.cost) + ')'; warn = true; }
+
+    hint.textContent = text;
+    hint.className = 'it-stock' + (warn ? ' warn' : '');
+}
+
+// ---------- Calculations ----------
 function totals(inv) {
     var sub = 0;
     inv.items.forEach(function (i) { sub += i.qty * i.price; });
@@ -131,7 +181,7 @@ function dueTag(inv) {
     return '<div class="due-tag t-green">' + n + ' days left</div>';
 }
 
-// ---------- Invoice (bill) ka html ----------
+// ---------- Invoice (bill) html ----------
 function billInner(inv) {
     var t = totals(inv);
     var rows = '';
@@ -266,7 +316,7 @@ function renderAll() {
     renderTable();
 }
 
-// ---------- Teen nuqton ka dropdown ----------
+// ---------- Three dots menu ----------
 var menu = document.createElement('div');
 menu.className = 'inv-menu';
 menu.style.display = 'none';
@@ -325,7 +375,7 @@ document.addEventListener('click', function (e) {
 window.addEventListener('scroll', closeMenu, true);
 window.addEventListener('resize', closeMenu);
 
-// ---------- Invoice dekhna ----------
+// ---------- View invoice ----------
 function openView(no) {
     var inv = findInv(no);
     if (!inv) return;
@@ -335,13 +385,14 @@ function openView(no) {
     $('view-modal').classList.add('show');
 }
 
-// ---------- Payment record karna ----------
+// ---------- Record payment ----------
 function openPay(no) {
     var inv = findInv(no);
     var t = totals(inv);
     payNo = no;
     $('pay-info').textContent = inv.no + ' - ' + inv.customer + ' | Balance: ' + money(t.balance);
     $('pay-amount').value = Math.round(t.balance);
+    $('pay-date').value = iso(0);
     $('pay-error').textContent = '';
     $('pay-modal').classList.add('show');
     $('pay-amount').focus();
@@ -351,10 +402,15 @@ function savePay() {
     var inv = findInv(payNo);
     var t = totals(inv);
     var amount = parseFloat($('pay-amount').value) || 0;
+    var date = $('pay-date').value;
+
     if (amount <= 0) { $('pay-error').textContent = 'Enter Amount.'; return; }
     if (amount > Math.round(t.balance)) { $('pay-error').textContent = 'Can not be more than balance.'; return; }
+    if (!date) { $('pay-error').textContent = 'Choose the payment date.'; return; }
+    if (date > iso(0)) { $('pay-error').textContent = 'Date cannot be in the future.'; return; }
+    if (date < inv.date) { $('pay-error').textContent = 'Date cannot be before the invoice date (' + inv.date + ').'; return; }
 
-    api('POST', '/invoices/' + encodeURIComponent(payNo) + '/pay', { amount: amount })
+    api('POST', '/invoices/' + encodeURIComponent(payNo) + '/pay', { amount: amount, date: date })
         .then(function () {
             $('pay-modal').classList.remove('show');
             toast('Payment is saved');
@@ -391,14 +447,15 @@ function confirmDelete() {
         });
 }
 
-// ---------- Naya invoice ----------
+// ---------- New invoice ----------
 function addItemRow() {
     var row = document.createElement('div');
     row.className = 'item-row';
-    row.innerHTML = '<input class="it-name" type="text" placeholder="Item name">' +
+    row.innerHTML = '<input class="it-name" type="text" list="inv-products" placeholder="Item name" autocomplete="off">' +
         '<input class="it-qty" type="number" value="1" min="1">' +
         '<input class="it-price" type="number" placeholder="Price">' +
-        '<button type="button" class="it-del"><i class="fa-solid fa-xmark"></i></button>';
+        '<button type="button" class="it-del"><i class="fa-solid fa-xmark"></i></button>' +
+        '<small class="it-stock"></small>';
     $('items').appendChild(row);
 }
 
@@ -451,7 +508,7 @@ function openNew() {
     $('new-modal').classList.add('show');
 }
 
-// Saari zaroori cheezein check karna. Theek ho to data wapas, warna null
+// Check everything. Returns the data if all is fine, otherwise null
 function validateNew() {
     newErrIds.forEach(function (id) { setErr(id, ''); });
     document.querySelectorAll('#items .is-invalid').forEach(function (el) { el.classList.remove('is-invalid'); });
@@ -467,7 +524,7 @@ function validateNew() {
     if (!due) { setErr('n-due', 'Choose the due date'); ok = false; }
     else if (due < iso(0)) { setErr('n-due', 'Due date cannot be before today'); ok = false; }
 
-    // Items (bilkul khali row ignore, baqi check)
+    // Items (completely empty rows are ignored, the rest are checked)
     var items = [];
     var itemMsg = '';
     document.querySelectorAll('#items .item-row').forEach(function (row) {
@@ -485,7 +542,7 @@ function validateNew() {
         if (!name) { nameEl.classList.add('is-invalid'); itemMsg = 'Every item needs a name'; }
         else if (isNaN(qty) || qty <= 0) { qtyEl.classList.add('is-invalid'); itemMsg = 'Quantity must be more than 0'; }
         else if (isNaN(price) || price <= 0) { priceEl.classList.add('is-invalid'); itemMsg = 'Enter a price more than 0 for "' + name + '"'; }
-        else { items.push({ name: name, qty: qty, price: price }); }
+        else { items.push({ name: name, qty: qty, price: price, product_id: row.dataset.product ? Number(row.dataset.product) : null }); }
     });
     if (!itemMsg && !items.length) { itemMsg = 'Add at least one item'; }
     if (itemMsg) { setErr('items', itemMsg); ok = false; }
@@ -505,7 +562,7 @@ function validateNew() {
     return ok ? { items: items, discount: discount, tax: tax, due: due } : null;
 }
 
-// Server ke bheje hue errors ko sahi field ke neeche dikhana
+// Show the errors sent by the server under the right field
 function showServerErrors(e) {
     var map = { customer_id: 'n-customer', due: 'n-due', discount: 'n-discount', tax: 'n-tax' };
     var shown = false;
@@ -534,13 +591,14 @@ function saveNew() {
         .then(function (res) {
             $('new-modal').classList.remove('show');
             toast(res.no + ' created');
+            loadProducts();
             loadInvoices().then(function () { openView(res.no); });
         })
         .catch(showServerErrors)
         .then(function () { $('new-save').disabled = false; });
 }
 
-// ---------- Buttons aur clicks ----------
+// ---------- Buttons and clicks ----------
 $('open-new').addEventListener('click', openNew);
 $('add-item').addEventListener('click', function () { addItemRow(); updatePreview(); });
 
@@ -548,6 +606,12 @@ function onFormEdit(e) {
     e.target.classList.remove('is-invalid');
     if (e.target.id) { setErr(e.target.id, ''); }
     if (e.target.closest('#items')) { setErr('items', ''); }
+
+    var itemRow = e.target.closest('.item-row');
+    if (itemRow && (e.target.classList.contains('it-name') || e.target.classList.contains('it-qty') || e.target.classList.contains('it-price'))) {
+        syncRow(itemRow, e.target.classList.contains('it-name'));
+    }
+
     updatePreview();
 }
 $('new-form').addEventListener('input', onFormEdit);
@@ -610,7 +674,21 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
-// ---------- Page khulte hi data mangwana ----------
+// ---------- Load the data when the page opens ----------
 loadCustomers();
 loadInvoices();
 loadCompany();
+loadProducts();
+
+// ---------- Customer chosen on the Customers page ----------
+(function () {
+    var wanted = new URLSearchParams(window.location.search).get('customer');
+    if (!wanted) { return; }
+
+    loadCustomers().then(function () {
+        openNew();
+        $('n-customer').value = wanted;
+        updatePreview();
+        window.history.replaceState(null, '', '/invoices');
+    });
+})();

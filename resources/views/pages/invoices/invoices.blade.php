@@ -24,23 +24,23 @@
     </div>
 
     <div class="cust-cards">
-    <div class="sum-card">
-        <span class="sum-icon c-main"><i class="fa-solid fa-chart-line"></i></span>
-        <div><p class="sum-label">This Month's Sales</p><p class="sum-value" id="sum-month">0</p><p class="sum-label" id="sum-month-note"></p></div>
+        <div class="sum-card">
+            <span class="sum-icon c-main"><i class="fa-solid fa-chart-line"></i></span>
+            <div><p class="sum-label">This Month's Sales</p><p class="sum-value" id="sum-month">0</p><p class="sum-label" id="sum-month-note"></p></div>
+        </div>
+        <div class="sum-card">
+            <span class="sum-icon c-blue"><i class="fa-solid fa-wallet"></i></span>
+            <div><p class="sum-label">Total Receivable</p><p class="sum-value" id="sum-recv">0</p><p class="sum-label" id="sum-recv-note"></p></div>
+        </div>
+        <div class="sum-card">
+            <span class="sum-icon c-amber"><i class="fa-regular fa-calendar-check"></i></span>
+            <div><p class="sum-label">Due This Week</p><p class="sum-value" id="sum-week">0</p><p class="sum-label" id="sum-week-note"></p></div>
+        </div>
+        <div class="sum-card">
+            <span class="sum-icon c-red"><i class="fa-solid fa-triangle-exclamation"></i></span>
+            <div><p class="sum-label">Overdue</p><p class="sum-value t-red" id="sum-late">0</p><p class="sum-label" id="sum-late-note"></p></div>
+        </div>
     </div>
-    <div class="sum-card">
-        <span class="sum-icon c-blue"><i class="fa-solid fa-wallet"></i></span>
-        <div><p class="sum-label">Total Receivable</p><p class="sum-value" id="sum-recv">0</p><p class="sum-label" id="sum-recv-note"></p></div>
-    </div>
-    <div class="sum-card">
-        <span class="sum-icon c-amber"><i class="fa-regular fa-calendar-check"></i></span>
-        <div><p class="sum-label">Due This Week</p><p class="sum-value" id="sum-week">0</p><p class="sum-label" id="sum-week-note"></p></div>
-    </div>
-    <div class="sum-card">
-        <span class="sum-icon c-red"><i class="fa-solid fa-triangle-exclamation"></i></span>
-        <div><p class="sum-label">Overdue</p><p class="sum-value t-red" id="sum-late">0</p><p class="sum-label" id="sum-late-note"></p></div>
-    </div>
-</div>
 
     <div class="cust-box">
         <div class="cust-toolbar">
@@ -101,6 +101,7 @@
                     <span class="sec-label">Items <span class="req">*</span></span>
                     <div class="item-head"><span>Item</span><span>Qty</span><span>Price</span><span></span></div>
                     <div id="items"></div>
+                    <datalist id="inv-products"></datalist>
                     <small class="field-err" data-err="items"></small>
                     <button type="button" class="add-item" id="add-item">+ Add item</button>
 
@@ -152,6 +153,7 @@
             <p class="sum-label" id="pay-info" style="margin-bottom:12px;"></p>
             <div class="form-grid" style="grid-template-columns:1fr;">
                 <div><label>Amount received (<span class="cur-sym">Rs</span>)</label><input type="number" id="pay-amount"></div>
+                <div><label>Payment date</label><input type="date" id="pay-date"></div>
             </div>
             <p class="form-error" id="pay-error"></p>
             <div class="modal-foot">

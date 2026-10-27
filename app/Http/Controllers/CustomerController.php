@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class CustomerController extends Controller
 {
@@ -36,6 +37,7 @@ class CustomerController extends Controller
                     'no' => $inv->no,
                     'date' => $inv->date,
                     'amount' => $inv->total(),
+                    'balance' => $inv->balance(),
                     'status' => $inv->status(),
                 ];
             }
@@ -53,41 +55,83 @@ class CustomerController extends Controller
     
         return response()->json($customers);
     }
-public function store(Request $request)
-{
-    $data = $request->validate([
-        'name' => 'required|string|max:255',
-        'phone' => 'required|string|max:50',
-        'whatsapp' => 'nullable|string|max:50',
-        'email' => 'nullable|email',
-        'city' => 'nullable|string|max:100',
-        'address' => 'nullable|string',
-        'limit' => 'required|numeric',
-        'opening' => 'required|numeric',
-        'notes' => 'nullable|string',
-    ]);
 
-    $customer = Customer::create($data);
+    public function store(Request $request)
+    {
+        $data = $request->validate([
+            'name' => 'required|string|max:255',
+            'phone' => 'required|string|max:50',
+            'whatsapp' => 'nullable|string|max:50',
+            'email' => 'nullable|email',
+            'city' => 'nullable|string|max:100',
+            'address' => 'nullable|string',
+            'limit' => 'required|numeric',
+            'opening' => 'required|numeric',
+            'notes' => 'nullable|string',
+        ]);
 
-    return response()->json(['id' => $customer->id]);
-}
-public function update(Request $request, Customer $customer)
-{
-    $data = $request->validate([
-        'name' => 'sometimes|required|string|max:255',
-        'phone' => 'sometimes|required|string|max:50',
-        'whatsapp' => 'nullable|string|max:50',
-        'email' => 'nullable|email',
-        'city' => 'nullable|string|max:100',
-        'address' => 'nullable|string',
-        'limit' => 'sometimes|numeric',
-        'opening' => 'sometimes|numeric',
-        'notes' => 'nullable|string',
-        'active' => 'sometimes|boolean',
-    ]);
+        $customer = Customer::create($data);
 
-    $customer->update($data);
+        return response()->json(['id' => $customer->id]);
+    }
 
-    return response()->json(['ok' => true]);
-}
+    public function update(Request $request, Customer $customer)
+    {
+        $data = $request->validate([
+            'name' => 'sometimes|required|string|max:255',
+            'phone' => 'sometimes|required|string|max:50',
+            'whatsapp' => 'nullable|string|max:50',
+            'email' => 'nullable|email',
+            'city' => 'nullable|string|max:100',
+            'address' => 'nullable|string',
+            'limit' => 'sometimes|numeric',
+            'opening' => 'sometimes|numeric',
+            'notes' => 'nullable|string',
+            'active' => 'sometimes|boolean',
+        ]);
+
+        $customer->update($data);
+
+        return response()->json(['ok' => true]);
+    }
+
+    // Receive one payment from a customer. It is split over the unpaid invoices, oldest first.
+    public function receive(Request $request, Customer $customer)
+    {
+        $customer->load('invoices.items', 'invoices.payments');
+
+        $open = $customer->invoices
+            ->filter(function ($inv) { return $inv->balance() > 0; })
+            ->sortBy(function ($inv) { return $inv->date . '-' . str_pad($inv->id, 8, '0', STR_PAD_LEFT); });
+
+        $totalDue = round($open->sum(function ($inv) { return $inv->balance(); }), 2);
+
+        if ($totalDue <= 0) {
+            return response()->json(['message' => 'This customer has no unpaid invoices.'], 422);
+        }
+
+        $data = $request->validate([
+            'amount' => 'required|numeric|gt:0|lte:' . $totalDue,
+            'date' => 'required|date|before_or_equal:today',
+        ]);
+
+        DB::transaction(function () use ($open, $data) {
+            $left = round((float) $data['amount'], 2);
+
+            foreach ($open as $inv) {
+                if ($left <= 0) { break; }
+
+                $pay = min($left, $inv->balance());
+
+                $inv->payments()->create([
+                    'amount' => $pay,
+                    'date' => $data['date'],
+                ]);
+
+                $left = round($left - $pay, 2);
+            }
+        });
+
+        return response()->json(['ok' => true]);
+    }
 }

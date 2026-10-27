@@ -44,6 +44,7 @@
     // ---------- Data (ab database se aata hai) ----------
     var purchases = [];
     var vendorsData = [];
+    var productsData = [];
 
     function vendorNames() {
         return vendorsData.map(function (v) { return v.name; });
@@ -61,6 +62,16 @@
             vendorsData = data.filter(function (v) { return v.status === 'active'; });
             fillVendorSelect();
             render();
+        });
+    }
+
+    // Product suggestions (item likhte waqt list mein aate hain)
+    function loadProducts() {
+        return api('GET', '/inventory/options').then(function (data) {
+            productsData = data;
+            $('pfProducts').innerHTML = data.map(function (p) {
+                return '<option value="' + esc(p.name) + '">';
+            }).join('');
         });
     }
 
@@ -395,7 +406,7 @@
         var row = document.createElement('div');
         row.className = 'pu-item-row';
         row.innerHTML =
-            '<input type="text" class="vd-input pu-desc" placeholder="Item description" maxlength="80">' +
+            '<input type="text" class="vd-input pu-desc" list="pfProducts" placeholder="Item description" maxlength="80">' +
             '<input type="number" class="vd-input pu-qty" min="0" step="any" placeholder="Qty">' +
             '<input type="number" class="vd-input pu-price" min="0" step="any" placeholder="Price">' +
             '<div class="pu-line-total">' + money(0) + '</div>' +
@@ -405,6 +416,8 @@
             row.querySelector('.pu-desc').value = it.desc;
             row.querySelector('.pu-qty').value = it.qty;
             row.querySelector('.pu-price').value = it.price;
+            if (it.product_id) { row.setAttribute('data-product', it.product_id); }
+            row.setAttribute('data-manual', '1');
         }
         $('pfItemRows').appendChild(row);
     }
@@ -415,7 +428,8 @@
                 row: row,
                 desc: row.querySelector('.pu-desc').value.trim(),
                 qtyRaw: row.querySelector('.pu-qty').value.trim(),
-                priceRaw: row.querySelector('.pu-price').value.trim()
+                priceRaw: row.querySelector('.pu-price').value.trim(),
+                productId: row.getAttribute('data-product')
             };
         });
     }
@@ -456,6 +470,33 @@
 
     $('pfItemRows').addEventListener('input', recalcForm);
 
+    // Item ka naam kisi product se match kare to product yaad rakho aur cost price bhar do
+    $('pfItemRows').addEventListener('input', function (e) {
+        if (!e.target.classList.contains('pu-desc')) { return; }
+
+        var row = e.target.closest('.pu-item-row');
+        var name = e.target.value.trim().toLowerCase();
+        var match = productsData.filter(function (p) { return p.name.toLowerCase() === name; })[0];
+
+        if (match) {
+            row.setAttribute('data-product', match.id);
+            // Price tab tak khud badalti rahegi jab tak tum usay haath se na likho
+            if (!row.hasAttribute('data-manual')) {
+                row.querySelector('.pu-price').value = match.cost;
+            }
+            recalcForm();
+        } else {
+            row.removeAttribute('data-product');
+        }
+    });
+
+    // Tum price khud likho to code usay dobara nahi badlega
+    $('pfItemRows').addEventListener('input', function (e) {
+        if (e.target.classList.contains('pu-price')) {
+            e.target.closest('.pu-item-row').setAttribute('data-manual', '1');
+        }
+    });
+
     $('pfItemRows').addEventListener('click', function (e) {
         var rm = e.target.closest('.pu-rm');
         if (!rm) { return; }
@@ -467,6 +508,8 @@
             row.querySelector('.pu-desc').value = '';
             row.querySelector('.pu-qty').value = '';
             row.querySelector('.pu-price').value = '';
+            row.removeAttribute('data-product');
+            row.removeAttribute('data-manual');
         }
         recalcForm();
     });
@@ -514,7 +557,14 @@
             if (!r.desc) { itemError = 'Every item needs a description'; }
             else if (isNaN(qty) || qty <= 0) { itemError = 'Quantity must be more than 0 for "' + r.desc + '"'; }
             else if (isNaN(price) || price < 0) { itemError = 'Enter a valid price for "' + r.desc + '"'; }
-            else { items.push({ desc: r.desc, qty: qty, price: price }); }
+            else {
+                items.push({
+                    product_id: r.productId ? Number(r.productId) : null,
+                    desc: r.desc,
+                    qty: qty,
+                    price: price
+                });
+            }
         });
 
         if (!itemError && !items.length) { itemError = 'Add at least one item'; }
@@ -543,6 +593,7 @@
                     toast('Purchase updated');
                     closeModal('puFormModal');
                     loadPurchases();
+                    loadProducts();
                 })
                 .catch(function (e) { toast(e.message || 'Could not update purchase', 'err'); });
         } else {
@@ -551,6 +602,7 @@
                     toast(res.no + ' created');
                     closeModal('puFormModal');
                     loadPurchases();
+                    loadProducts();
                 })
                 .catch(function (e) { toast(e.message || 'Could not save purchase', 'err'); });
         }
@@ -689,4 +741,28 @@
     // ---------- Page khulte hi data mangwana ----------
     loadVendors();
     loadPurchases();
+    loadProducts();
+
+    // ---------- Low Stock page se aayi hui draft list ----------
+    function openDraft() {
+        if (new URLSearchParams(window.location.search).get('draft') !== '1') { return; }
+
+        var raw = sessionStorage.getItem('purchaseDraft');
+        if (!raw) { return; }
+        sessionStorage.removeItem('purchaseDraft');
+
+        var items;
+        try { items = JSON.parse(raw); } catch (err) { return; }
+        if (!items || !items.length) { return; }
+
+        openForm(null);
+        $('pfItemRows').innerHTML = '';
+        items.forEach(addItemRow);
+        recalcForm();
+
+        window.history.replaceState(null, '', '/purchases');
+        toast('Draft loaded. Choose the vendor and save.');
+    }
+
+    openDraft();
 })();

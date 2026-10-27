@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Purchase extends Model
 {
+    use \App\Models\Concerns\Auditable;
     protected $fillable = ['no', 'vendor_id', 'date', 'due', 'notes'];
 
 public function items()

@@ -1,0 +1,251 @@
+/* =========================================================
+   Motion: chhote chhote animations jo poore software mein lagte hain
+   (animation band karne wale users ke liye neeche reduce-motion hai)
+   ========================================================= */
+
+   @keyframes mRise {
+    from { opacity: 0; transform: translateY(16px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+@keyframes mPop {
+    0% { opacity: 0; transform: scale(0.9); }
+    60% { transform: scale(1.04); }
+    100% { opacity: 1; transform: scale(1); }
+}
+@keyframes mPulse {
+    0%, 100% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--main) 40%, transparent); }
+    50% { box-shadow: 0 0 0 8px color-mix(in srgb, var(--main) 0%, transparent); }
+}
+@keyframes mRowIn {
+    from { opacity: 0; transform: translateX(-12px); }
+    to { opacity: 1; transform: translateX(0); }
+}
+@keyframes mShake {
+    0%, 100% { transform: translateX(0); }
+    25% { transform: translateX(-5px); }
+    75% { transform: translateX(5px); }
+}
+
+/* ---------- Page khulte hi cheezein neeche se uthti hain ---------- */
+.content > *:not(.vd-modal-overlay):not(.vd-overlay):not(.vd-side):not(.vd-toast) {
+    animation: mRise 0.55s cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.content > *:nth-child(2):not(.vd-modal-overlay):not(.vd-overlay):not(.vd-side):not(.vd-toast) { animation-delay: 0.06s; }
+.content > *:nth-child(3):not(.vd-modal-overlay):not(.vd-overlay):not(.vd-side):not(.vd-toast) { animation-delay: 0.12s; }
+.content > *:nth-child(4):not(.vd-modal-overlay):not(.vd-overlay):not(.vd-side):not(.vd-toast) { animation-delay: 0.18s; }
+.content > *:nth-child(5):not(.vd-modal-overlay):not(.vd-overlay):not(.vd-side):not(.vd-toast) { animation-delay: 0.24s; }
+
+/* ---------- Cards ---------- */
+.vd-card {
+    transition: transform 0.25s ease, box-shadow 0.25s ease, border-color 0.25s ease;
+}
+.vd-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.12);
+    border-color: var(--main);
+}
+.vd-card .vd-icon { transition: transform 0.3s ease; }
+.vd-card:hover .vd-icon { transform: rotate(-8deg) scale(1.12); }
+.vd-cards > .vd-card { animation: mRise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.vd-cards > .vd-card:nth-child(2) { animation-delay: 0.08s; }
+.vd-cards > .vd-card:nth-child(3) { animation-delay: 0.16s; }
+.vd-cards > .vd-card:nth-child(4) { animation-delay: 0.24s; }
+
+/* ---------- Tables: rows ek ek karke aati hain ---------- */
+.vd-table tbody tr {
+    animation: mRowIn 0.4s ease backwards;
+    transition: background 0.2s ease;
+}
+.vd-table tbody tr:nth-child(1) { animation-delay: 0.02s; }
+.vd-table tbody tr:nth-child(2) { animation-delay: 0.05s; }
+.vd-table tbody tr:nth-child(3) { animation-delay: 0.08s; }
+.vd-table tbody tr:nth-child(4) { animation-delay: 0.11s; }
+.vd-table tbody tr:nth-child(5) { animation-delay: 0.14s; }
+.vd-table tbody tr:nth-child(6) { animation-delay: 0.17s; }
+.vd-table tbody tr:nth-child(7) { animation-delay: 0.2s; }
+.vd-table tbody tr:nth-child(8) { animation-delay: 0.23s; }
+.vd-table tbody tr:nth-child(n+9) { animation-delay: 0.26s; }
+
+/* ---------- Buttons ---------- */
+.vd-btn-primary,
+.vd-btn-ghost,
+.vd-btn-danger {
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+}
+.vd-btn-primary:hover { transform: translateY(-2px); box-shadow: 0 10px 22px color-mix(in srgb, var(--main) 40%, transparent); }
+.vd-btn-ghost:hover,
+.vd-btn-danger:hover { transform: translateY(-2px); }
+.vd-btn-primary:active,
+.vd-btn-ghost:active,
+.vd-btn-danger:active { transform: translateY(0) scale(0.98); }
+
+.vd-btn-primary::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: -70%;
+    width: 45%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-20deg);
+    transition: left 0.55s ease;
+}
+.vd-btn-primary:hover::after { left: 130%; }
+
+/* ---------- Chips, badges ---------- */
+.vd-chip { transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease; }
+.vd-chip:hover { transform: translateY(-2px); }
+.vd-chip.active { animation: mPop 0.35s ease; }
+
+.iv-badge-out,
+.iv-badge-low { animation: mPulse 2.4s ease-in-out infinite; }
+
+/* ---------- Modal ke andar fields ---------- */
+.vd-modal-overlay.open .vd-field { animation: mRise 0.4s ease backwards; }
+.vd-modal-overlay.open .vd-field:nth-child(2) { animation-delay: 0.04s; }
+.vd-modal-overlay.open .vd-field:nth-child(3) { animation-delay: 0.08s; }
+.vd-modal-overlay.open .vd-field:nth-child(4) { animation-delay: 0.12s; }
+.vd-modal-overlay.open .vd-field:nth-child(n+5) { animation-delay: 0.16s; }
+
+.vd-input { transition: border-color 0.2s ease, box-shadow 0.2s ease; }
+.vd-input:focus { box-shadow: 0 0 0 4px color-mix(in srgb, var(--main) 18%, transparent); }
+.vd-invalid { animation: mShake 0.35s; }
+
+/* ---------- Toast ---------- */
+.vd-toast.show { animation: mPop 0.4s ease; }
+
+/* ---------- Sidebar ---------- */
+.menu-link { transition: transform 0.2s ease, background 0.2s ease, color 0.2s ease; }
+.menu-link:hover { transform: translateX(4px); }
+.menu-link i { transition: transform 0.25s ease; }
+.menu-link:hover i { transform: scale(1.2) rotate(-6deg); }
+
+/* ---------- Navbar user menu ---------- */
+.user {
+    position: relative;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 4px 8px;
+    border-radius: 12px;
+    transition: background 0.2s ease;
+}
+.user:hover { background: var(--hover); }
+.user-caret { font-size: 11px; color: var(--muted); transition: transform 0.25s ease; }
+.user:has(.user-dropdown.open) .user-caret { transform: rotate(180deg); }
+
+.user-dropdown {
+    position: absolute;
+    top: calc(100% + 10px);
+    right: 0;
+    min-width: 190px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 6px;
+    box-shadow: 0 18px 40px rgba(15, 23, 42, 0.18);
+    opacity: 0;
+    transform: translateY(-8px) scale(0.97);
+    transform-origin: top right;
+    pointer-events: none;
+    transition: opacity 0.2s ease, transform 0.2s ease;
+    z-index: 60;
+}
+.user-dropdown.open { opacity: 1; transform: translateY(0) scale(1); pointer-events: auto; }
+.user-dropdown form { margin: 0; }
+
+.ud-item {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 12px;
+    border: none;
+    background: none;
+    border-radius: 9px;
+    color: var(--text);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    transition: background 0.15s ease, transform 0.15s ease;
+}
+.ud-item:hover { background: var(--hover); transform: translateX(3px); }
+.ud-item i { width: 16px; color: var(--muted); }
+.ud-danger, .ud-danger i { color: #ef4444; }
+
+/* ---------- Change password popup ---------- */
+.pw-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+    z-index: 200;
+}
+.pw-overlay.open { opacity: 1; pointer-events: auto; }
+.pw-box {
+    width: 100%;
+    max-width: 400px;
+    background: var(--card);
+    color: var(--text);
+    border-radius: 18px;
+    padding: 22px;
+    transform: translateY(20px) scale(0.96);
+    transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.pw-overlay.open .pw-box { transform: translateY(0) scale(1); }
+.pw-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 14px; }
+.pw-head h3 { font-size: 18px; }
+.pw-x { border: none; background: var(--hover); width: 34px; height: 34px; border-radius: 50%; cursor: pointer; color: var(--muted); }
+.pw-field { margin-bottom: 12px; }
+.pw-field label { display: block; font-size: 13px; font-weight: 500; margin-bottom: 5px; }
+.pw-req { color: #ef4444; }
+.pw-field input {
+    width: 100%;
+    height: 42px;
+    padding: 0 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--bg);
+    color: var(--text);
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.pw-field input:focus { border-color: var(--main); box-shadow: 0 0 0 4px color-mix(in srgb, var(--main) 18%, transparent); }
+.pw-err { display: block; color: #ef4444; font-size: 12px; margin-top: 4px; }
+.pw-foot { display: flex; gap: 10px; justify-content: flex-end; margin-top: 16px; }
+.pw-btn { height: 40px; padding: 0 18px; border-radius: 10px; border: none; cursor: pointer; font-weight: 600; transition: transform 0.2s ease; }
+.pw-btn:hover { transform: translateY(-2px); }
+.pw-main { background: var(--main); color: #fff; }
+.pw-ghost { background: var(--hover); color: var(--text); }
+.pw-toast {
+    position: fixed;
+    bottom: 26px;
+    right: 26px;
+    background: #16a34a;
+    color: #fff;
+    padding: 12px 18px;
+    border-radius: 12px;
+    opacity: 0;
+    transform: translateY(20px);
+    pointer-events: none;
+    transition: opacity 0.3s ease, transform 0.3s ease;
+    z-index: 210;
+}
+.pw-toast.show { opacity: 1; transform: translateY(0); }
+
+/* ---------- Animation band karne wale users ke liye ---------- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation: none !important;
+        transition: none !important;
+    }
+}

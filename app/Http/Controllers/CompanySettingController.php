@@ -62,25 +62,130 @@ class CompanySettingController extends Controller
         ->with('success', 'Company settings saved')
         ->with('open', $request->has('contact_phone') ? 'section-contact' : 'section-company');
     }
+
     public function info()
-{
-    $c = CompanySetting::first();
+    {
+        $c = CompanySetting::first();
 
-    return response()->json([
-        'name' => $c->company_name ?? '',
-        'address' => $c->address ?? '',
-        'phone' => $c->phone ?? '',
-    ]);
-}
-public function saveSystem(Request $request)
-{
-    $data = $request->validate([
-        'currency' => 'required|in:PKR,USD,AED,SAR,EUR',
-        'symbol_position' => 'required|in:before,after',
-    ]);
+        return response()->json([
+            'name' => $c->company_name ?? '',
+            'address' => $c->address ?? '',
+            'phone' => $c->phone ?? '',
+        ]);
+    }
 
-    CompanySetting::updateOrCreate(['id' => 1], $data);
+    public function saveSystem(Request $request)
+    {
+        $data = $request->validate([
+            'currency' => 'required|in:PKR,USD,AED,SAR,EUR',
+            'symbol_position' => 'required|in:before,after',
+        ]);
 
-    return response()->json(['ok' => true]);
-}
+        CompanySetting::updateOrCreate(['id' => 1], $data);
+
+        return response()->json(['ok' => true]);
+    }
+
+    // ---------- Brand: font, theme color, title, footer ----------
+    public function saveBrand(Request $request)
+    {
+        $data = $request->validate([
+            'brand_font' => ['required', Rule::in(['segoe', 'poppins', 'roboto', 'notoserif'])],
+            'brand_theme' => ['required', Rule::in(['emerald', 'ocean', 'purple', 'sunset', 'rose', 'sky', 'custom'])],
+            'brand_custom_color' => ['nullable', 'regex:/^#[0-9a-fA-F]{6}$/'],
+            'brand_title' => ['required', 'string', 'min:2', 'max:60'],
+            'brand_footer' => ['nullable', 'string', 'max:150'],
+        ], [
+            'brand_title.required' => 'Title cannot be empty.',
+            'brand_title.min' => 'Title must be at least 2 characters.',
+            'brand_custom_color.regex' => 'Custom color must look like #ff5500.',
+        ]);
+
+        if ($data['brand_theme'] === 'custom' && empty($data['brand_custom_color'])) {
+            return response()->json(['message' => 'Choose a custom color first.'], 422);
+        }
+
+        CompanySetting::updateOrCreate(['id' => 1], $data);
+
+        return response()->json(['ok' => true]);
+    }
+
+    // ---------- Brand: logo (saved as a file in public/uploads/brand) ----------
+    public function saveLogo(Request $request)
+    {
+        $request->validate([
+            'logo' => ['required', 'string', 'max:3000000'],
+        ], [
+            'logo.required' => 'Choose an image first.',
+        ]);
+
+        $logo = $request->input('logo');
+
+        if (!preg_match('/^data:image\/(png|jpeg|svg\+xml);base64,/', $logo, $m)) {
+            return response()->json(['message' => 'Only PNG, JPG or SVG images are allowed.'], 422);
+        }
+
+        $binary = base64_decode(substr($logo, strpos($logo, ',') + 1), true);
+
+        if ($binary === false || strlen($binary) === 0) {
+            return response()->json(['message' => 'This image could not be read.'], 422);
+        }
+
+        $types = ['png' => 'png', 'jpeg' => 'jpg', 'svg+xml' => 'svg'];
+        $ext = $types[$m[1]];
+
+        if ($ext === 'svg') {
+            // An SVG must not carry scripts
+            if (preg_match('/<script|javascript:|\son[a-z]+\s*=|<foreignObject/i', $binary)) {
+                return response()->json(['message' => 'This SVG is not allowed. Please use a plain logo.'], 422);
+            }
+        } else {
+            $info = @getimagesizefromstring($binary);
+            $mime = $ext === 'png' ? 'image/png' : 'image/jpeg';
+
+            if (!$info || $info['mime'] !== $mime) {
+                return response()->json(['message' => 'This image could not be read.'], 422);
+            }
+        }
+
+        $dir = public_path('uploads/brand');
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $current = CompanySetting::first();
+        if ($current && $current->brand_logo) {
+            $this->deleteLogoFile($current->brand_logo);
+        }
+
+        $name = 'logo-' . time() . '.' . $ext;
+        file_put_contents($dir . '/' . $name, $binary);
+
+        CompanySetting::updateOrCreate(['id' => 1], ['brand_logo' => 'uploads/brand/' . $name]);
+
+        return response()->json(['ok' => true, 'url' => asset('uploads/brand/' . $name)]);
+    }
+
+    public function removeLogo()
+    {
+        $current = CompanySetting::first();
+
+        if ($current && $current->brand_logo) {
+            $this->deleteLogoFile($current->brand_logo);
+            $current->update(['brand_logo' => null]);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    private function deleteLogoFile($path)
+    {
+        if ($path && strpos($path, 'uploads/brand/') === 0 && strpos($path, '..') === false) {
+            $full = public_path($path);
+
+            if (is_file($full)) {
+                @unlink($full);
+            }
+        }
+    }
 }

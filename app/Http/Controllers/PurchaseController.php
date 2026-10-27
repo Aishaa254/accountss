@@ -20,13 +20,14 @@ class PurchaseController extends Controller
         'items.*.desc' => 'required|string|max:255',
         'items.*.qty' => 'required|numeric|gt:0',
         'items.*.price' => 'required|numeric|min:0',
+        'items.*.product_id' => 'nullable|exists:products,id',
     ];
 }
 
 private function itemRows(array $items): array
 {
     return array_map(function ($i) {
-        return ['description' => $i['desc'], 'qty' => $i['qty'], 'price' => $i['price']];
+        return ['product_id' => $i['product_id'] ?? null, 'description' => $i['desc'], 'qty' => $i['qty'], 'price' => $i['price']];
     }, $items);
 }
 
@@ -42,7 +43,8 @@ public function index()
             'due' => $p->due,
             'notes' => $p->notes ?? '',
             'items' => $p->items->map(function ($i) {
-                return ['desc' => $i->description, 'qty' => $i->qty, 'price' => $i->price];
+    
+                return ['product_id' => $i->product_id, 'desc' => $i->description, 'qty' => $i->qty, 'price' => $i->price];
             })->values(),
             'payments' => $p->payments->map(function ($x) {
                 return ['date' => $x->date, 'amount' => $x->amount, 'method' => $x->method];

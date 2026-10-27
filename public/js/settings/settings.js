@@ -1,4 +1,25 @@
-// Menu: ek waqt mein ek section
+// Send JSON to Laravel. If the server says no, the error message is thrown
+function sendJson(method, url, body) {
+    return fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify(body || {})
+    }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+            if (!res.ok) {
+                var keys = Object.keys(data.errors || {});
+                throw new Error(keys.length ? data.errors[keys[0]][0] : (data.message || 'Request failed'));
+            }
+            return data;
+        });
+    });
+}
+
+// Menu: one section at a time
 var menuLinks = document.querySelectorAll('.settings-link');
 var sections = document.querySelectorAll('.section');
 
@@ -37,7 +58,7 @@ function markColor(name) {
     });
 }
 
-markColor(localStorage.getItem('theme') || 'emerald');
+markColor(BRAND.theme || 'emerald');
 
 colorBoxes.forEach(function (box) {
     box.addEventListener('click', function () {
@@ -54,7 +75,7 @@ document.getElementById('reset-theme').addEventListener('click', function () {
     markColor('emerald');
 });
 
-// Light / Dark mode
+// Light / Dark mode (saved in this browser only)
 var modeButtons = document.querySelectorAll('.mode-btn');
 
 function markMode(mode) {
@@ -83,7 +104,7 @@ function markFont(name) {
     });
 }
 
-markFont(localStorage.getItem('font') || 'segoe');
+markFont(BRAND.font || 'segoe');
 
 fontButtons.forEach(function (button) {
     button.addEventListener('click', function () {
@@ -94,37 +115,46 @@ fontButtons.forEach(function (button) {
     });
 });
 
-// Title input mein saved naam dikhao
+// Show the saved title and footer in the inputs
 var titleInput = document.getElementById('titleText');
-if (titleInput) {
-    titleInput.value = localStorage.getItem('appTitle') || 'AccountPro';
-}
+var footerInput = document.getElementById('footerText');
+if (titleInput) { titleInput.value = BRAND.title || 'AccountPro'; }
+if (footerInput) { footerInput.value = BRAND.footer || ''; }
 
-// Brand: Save Changes dabane par hi save
+// Brand: saved to the database only when Save Changes is clicked
 document.getElementById('brandSave').addEventListener('click', function () {
-    if (pending.theme) {
-        localStorage.setItem('theme', pending.theme);
-    }
-    if (pending.theme === 'custom' && pending.customColor) {
-        localStorage.setItem('customColor', pending.customColor);
-    }
-    if (pending.mode) {
-        localStorage.setItem('mode', pending.mode);
-    }
-    if (pending.font) {
-        localStorage.setItem('font', pending.font);
-    }
+    var title = titleInput ? titleInput.value.trim() : '';
+    if (!title) { alert('Title cannot be empty'); return; }
 
-    if (titleInput) {
-        var newTitle = titleInput.value.trim();
-        if (newTitle) {
-            localStorage.setItem('appTitle', newTitle);
+    var theme = pending.theme || BRAND.theme || 'emerald';
+    var custom = pending.customColor || BRAND.customColor || '';
+    if (theme === 'custom' && !custom) { alert('Choose a custom color first'); return; }
+
+    var payload = {
+        brand_font: pending.font || BRAND.font || 'segoe',
+        brand_theme: theme,
+        brand_custom_color: custom || null,
+        brand_title: title,
+        brand_footer: footerInput ? footerInput.value.trim() : ''
+    };
+
+    sendJson('POST', '/settings/brand', payload)
+        .then(function () {
+            if (pending.mode) { localStorage.setItem('mode', pending.mode); }
+
+            BRAND.font = payload.brand_font;
+            BRAND.theme = payload.brand_theme;
+            BRAND.customColor = custom;
+            BRAND.title = payload.brand_title;
+            BRAND.footer = payload.brand_footer;
+
+            pending = {};
             applyTitle();
-        }
-    }
-
-    pending = {};
-    alert('Brand settings saved');
+            alert('Brand settings saved');
+        })
+        .catch(function (err) {
+            alert(err.message || 'Could not save brand settings');
+        });
 });
 
 // ===== Logo (Light / Dark preview) =====
@@ -166,7 +196,7 @@ document.getElementById('brandSave').addEventListener('click', function () {
         }
     }
 
-    showPreview(localStorage.getItem('brandLogo'));
+    showPreview(BRAND.logo || null);
     updateSidebar();
 
     chooseBtn.addEventListener('click', function () {
@@ -227,28 +257,41 @@ document.getElementById('brandSave').addEventListener('click', function () {
             show('Choose an image first', 'error');
             return;
         }
-        try {
-            localStorage.setItem('brandLogo', pendingLogo);
-        } catch (e) {
-            show('Could not save, try a smaller image', 'error');
-            return;
-        }
-        pendingLogo = null;
-        file.value = '';
-        updateSidebar();
-        show('Logo saved', 'ok');
+
+        saveBtn.disabled = true;
+
+        sendJson('POST', '/settings/brand/logo', { logo: pendingLogo })
+            .then(function (res) {
+                BRAND.logo = res.url;
+                pendingLogo = null;
+                file.value = '';
+                showPreview(res.url);
+                updateSidebar();
+                show('Logo saved', 'ok');
+            })
+            .catch(function (err) {
+                show(err.message || 'Could not save the logo', 'error');
+            })
+            .then(function () { saveBtn.disabled = false; });
     });
 
     removeBtn.addEventListener('click', function () {
-        localStorage.removeItem('brandLogo');
-        pendingLogo = null;
-        file.value = '';
-        showPreview(null);
-        updateSidebar();
-        show('Logo removed', 'ok');
+        sendJson('DELETE', '/settings/brand/logo')
+            .then(function () {
+                BRAND.logo = '';
+                pendingLogo = null;
+                file.value = '';
+                showPreview(null);
+                updateSidebar();
+                show('Logo removed', 'ok');
+            })
+            .catch(function (err) {
+                show(err.message || 'Could not remove the logo', 'error');
+            });
     });
 })();
-// System: currency save (database mein)
+
+// System: currency save (database)
 var currencySelect = document.getElementById('currency');
 var positionSelect = document.getElementById('symbolPosition');
 var appSettings = window.APP_SETTINGS || {};
@@ -398,15 +441,14 @@ document.getElementById('systemSave').addEventListener('click', function () {
         });
     });
 
-    // Server se error aaye to usi section ko khol do
-       // Server se error ya success aaye to usi section ko khol do
-       var page = document.querySelector('.settings-page');
-       var openId = page ? page.getAttribute('data-open') : '';
-       var bad = document.querySelector('.validate-form .is-invalid');
-       if (bad && bad.closest('.section')) { openId = bad.closest('.section').id; }
-       if (openId) {
-           var link = document.querySelector('.settings-link[data-section="' + openId + '"]');
-           if (link) link.click();
-       }
+    // If the server sends an error or success, open the same section
+    var page = document.querySelector('.settings-page');
+    var openId = page ? page.getAttribute('data-open') : '';
+    var bad = document.querySelector('.validate-form .is-invalid');
+    if (bad && bad.closest('.section')) { openId = bad.closest('.section').id; }
+    if (openId) {
+        var link = document.querySelector('.settings-link[data-section="' + openId + '"]');
+        if (link) link.click();
+    }
 
-    })();
+})();

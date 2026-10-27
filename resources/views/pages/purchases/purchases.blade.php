@@ -155,6 +155,7 @@
                     <span>Description</span><span>Qty</span><span>Unit price</span><span>Total</span><span></span>
                 </div>
                 <div id="pfItemRows"></div>
+                <datalist id="pfProducts"></datalist>
             </div>
             <small class="vd-err" data-err="pfItems"></small>
             <button type="button" class="vd-btn-ghost pu-add-item" id="pfAddItem"><i class="fa-solid fa-plus"></i> Add item</button>

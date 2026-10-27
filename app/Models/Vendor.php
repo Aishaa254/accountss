@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class Vendor extends Model
 {
+    use \App\Models\Concerns\Auditable;
     protected $fillable = ['name','company','category','phone','email','city','address','notes','status','terms','opening','pinned'];
 
 protected $casts = [

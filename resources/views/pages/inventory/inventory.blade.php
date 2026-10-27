@@ -13,120 +13,200 @@
 
 @section('content')
 
+<div id="ivPage" class="iv-view-all">
+
 <div class="vd-head">
     <div>
-        <h1 class="vd-title">Inventory</h1>
-        <p class="vd-sub">Know what you have, what is selling, and what to order next.</p>
+        <h1 class="vd-title" id="ivTitle">Inventory</h1>
+        <p class="vd-sub" id="ivSub"></p>
     </div>
     <button type="button" class="vd-btn-primary" id="ivNew"><i class="fa-solid fa-plus"></i> Add Product</button>
 </div>
 
-<!-- ===== Cards ===== -->
-<div class="vd-cards">
-    <div class="vd-card">
-        <div class="vd-icon vd-icon-main"><i class="fa-solid fa-boxes-stacked"></i></div>
-        <div>
-            <div class="vd-value" id="ivCardCount">0</div>
-            <div class="vd-label">Products</div>
-            <div class="vd-note" id="ivCardCountNote"></div>
+<!-- ================= VIEW 1: ALL PRODUCTS (Catalog) ================= -->
+<div id="viewAll">
+
+    <div class="vd-cards">
+        <div class="vd-card">
+            <div class="vd-icon vd-icon-main"><i class="fa-solid fa-boxes-stacked"></i></div>
+            <div>
+                <div class="vd-value" id="ivCardCount">0</div>
+                <div class="vd-label">Products</div>
+                <div class="vd-note" id="ivCardCountNote"></div>
+            </div>
+        </div>
+
+        <div class="vd-card">
+            <div class="vd-icon vd-icon-blue"><i class="fa-solid fa-warehouse"></i></div>
+            <div>
+                <div class="vd-value" id="ivCardValue">0</div>
+                <div class="vd-label">Stock Value (at cost)</div>
+                <div class="vd-note" id="ivCardValueNote"></div>
+            </div>
+        </div>
+
+        <div class="vd-card">
+            <div class="vd-icon vd-icon-orange"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <div>
+                <div class="vd-value" id="ivCardLow">0</div>
+                <div class="vd-label">Low or Out of Stock</div>
+                <div class="vd-note" id="ivCardLowNote"></div>
+            </div>
+        </div>
+
+        <div class="vd-card">
+            <div class="vd-icon vd-icon-red"><i class="fa-solid fa-hourglass-half"></i></div>
+            <div>
+                <div class="vd-value" id="ivCardSlow">0</div>
+                <div class="vd-label">Money Stuck in Slow Stock</div>
+                <div class="vd-note" id="ivCardSlowNote"></div>
+            </div>
         </div>
     </div>
 
-    <div class="vd-card">
-        <div class="vd-icon vd-icon-blue"><i class="fa-solid fa-warehouse"></i></div>
-        <div>
-            <div class="vd-value" id="ivCardValue">0</div>
-            <div class="vd-label">Stock Value (at cost)</div>
-            <div class="vd-note" id="ivCardValueNote"></div>
+    <div class="vd-panel iv-mb">
+        <div class="iv-box-body">
+            <h3 class="iv-box-title"><i class="fa-solid fa-heart-pulse"></i> Stock Health</h3>
+            <div class="iv-health-bar" id="ivHealthBar"></div>
+            <div class="iv-health-legend" id="ivHealthLegend"></div>
         </div>
     </div>
 
-    <div class="vd-card">
-        <div class="vd-icon vd-icon-orange"><i class="fa-solid fa-triangle-exclamation"></i></div>
-        <div>
-            <div class="vd-value" id="ivCardLow">0</div>
-            <div class="vd-label">Low or Out of Stock</div>
-            <div class="vd-note" id="ivCardLowNote"></div>
+    <div class="iv-insights">
+        <div class="vd-panel">
+            <div class="iv-box-body">
+                <h3 class="iv-box-title"><i class="fa-solid fa-fire"></i> Best Sellers</h3>
+                <div id="ivBest"></div>
+            </div>
+        </div>
+
+        <div class="vd-panel">
+            <div class="iv-box-body">
+                <h3 class="iv-box-title"><i class="fa-solid fa-sack-dollar"></i> Most Profitable</h3>
+                <div id="ivProfit"></div>
+            </div>
+        </div>
+
+        <div class="vd-panel">
+            <div class="iv-box-body">
+                <h3 class="iv-box-title"><i class="fa-solid fa-layer-group"></i> Value by Category</h3>
+                <div id="ivCats"></div>
+            </div>
         </div>
     </div>
 
-    <div class="vd-card">
-        <div class="vd-icon vd-icon-red"><i class="fa-solid fa-hourglass-half"></i></div>
-        <div>
-            <div class="vd-value" id="ivCardSlow">0</div>
-            <div class="vd-label">Money Stuck in Slow Stock</div>
-            <div class="vd-note" id="ivCardSlowNote"></div>
+    <div class="vd-panel">
+        <div class="vd-toolbar">
+            <div class="vd-search">
+                <i class="fa-solid fa-magnifying-glass"></i>
+                <input type="text" id="ivSearch" placeholder="Search by name, SKU or category">
+            </div>
+
+            <div class="vd-chips" id="ivChips">
+                <button type="button" class="vd-chip active" data-filter="all">All <span id="ivcAll">0</span></button>
+                <button type="button" class="vd-chip" data-filter="in">In Stock <span id="ivcIn">0</span></button>
+                <button type="button" class="vd-chip" data-filter="low">Low <span id="ivcLow">0</span></button>
+                <button type="button" class="vd-chip" data-filter="out">Out <span id="ivcOut">0</span></button>
+                <button type="button" class="vd-chip" data-filter="slow">Slow <span id="ivcSlow">0</span></button>
+                <button type="button" class="vd-chip" data-filter="inactive">Inactive <span id="ivcInactive">0</span></button>
+            </div>
+
+            <select class="vd-sort" id="ivCat"></select>
+
+            <select class="vd-sort" id="ivSort">
+                <option value="name">Sort: Name</option>
+                <option value="stock">Sort: Lowest stock</option>
+                <option value="value">Sort: Highest value</option>
+                <option value="sold">Sort: Best selling</option>
+            </select>
+
+            <div class="iv-layout" id="ivLayout">
+                <button type="button" data-layout="grid" title="Cards"><i class="fa-solid fa-table-cells-large"></i></button>
+                <button type="button" data-layout="table" title="Table"><i class="fa-solid fa-list"></i></button>
+            </div>
+        </div>
+
+        <div class="iv-grid" id="ivGrid"></div>
+
+        <div class="vd-table-wrap" id="ivTableWrap">
+            <table class="vd-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Stock</th>
+                        <th>Price</th>
+                        <th>Stock Value</th>
+                        <th>Status</th>
+                        <th></th>
+                    </tr>
+                </thead>
+                <tbody id="ivRows"></tbody>
+            </table>
         </div>
     </div>
 </div>
 
-<!-- ===== Insights ===== -->
-<div class="iv-insights">
-    <div class="vd-panel">
-        <div class="iv-box-body">
-            <h3 class="iv-box-title"><i class="fa-solid fa-fire"></i> Best Sellers</h3>
-            <div id="ivBest"></div>
+<!-- ================= VIEW 2: LOW STOCK (Reorder Planner) ================= -->
+<div id="viewLow" style="display:none">
+
+    <div class="iv-hero iv-hero-low">
+        <div class="iv-hero-text">
+            <h2><i class="fa-solid fa-cart-arrow-down"></i> Reorder Planner</h2>
+            <p id="ivLowSummary"></p>
+        </div>
+        <div class="iv-hero-stats">
+            <div><b id="lowCount">0</b><span>need attention</span></div>
+            <div><b id="lowOut">0</b><span>out of stock</span></div>
+            <div><b id="lowBudget">0</b><span>estimated budget</span></div>
         </div>
     </div>
 
-    <div class="vd-panel">
-        <div class="iv-box-body">
-            <h3 class="iv-box-title"><i class="fa-solid fa-cart-arrow-down"></i> Time to Reorder</h3>
-            <div id="ivReorder"></div>
-        </div>
-    </div>
+    <div id="ivPlanner"></div>
 
-    <div class="vd-panel">
-        <div class="iv-box-body">
-            <h3 class="iv-box-title"><i class="fa-solid fa-snowflake"></i> Slow Moving</h3>
-            <div id="ivSlow"></div>
+    <div class="iv-planbar" id="ivPlanBar">
+        <div class="iv-plan-info">
+            <b id="planSel">0</b> selected
+            <span class="iv-plan-total">Total <b id="planTotal">0</b></span>
+        </div>
+        <div class="iv-plan-actions">
+            <button type="button" class="vd-btn-ghost" id="planCopy"><i class="fa-brands fa-whatsapp"></i> Copy message</button>
+            <button type="button" class="vd-btn-ghost" id="planCsv"><i class="fa-solid fa-file-arrow-down"></i> CSV</button>
+            <button type="button" class="vd-btn-primary" id="planDraft"><i class="fa-solid fa-cart-shopping"></i> Create purchase</button>
         </div>
     </div>
 </div>
 
-<!-- ===== List ===== -->
-<div class="vd-panel">
+<!-- ================= VIEW 3: SLOW MOVING (Dead Stock) ================= -->
+<div id="viewSlow" style="display:none">
 
-    <div class="vd-toolbar">
-        <div class="vd-search">
-            <i class="fa-solid fa-magnifying-glass"></i>
-            <input type="text" id="ivSearch" placeholder="Search by name, SKU or category">
+    <div class="iv-hero iv-hero-slow">
+        <div class="iv-hero-text">
+            <h2><i class="fa-solid fa-snowflake"></i> Slow Moving Stock</h2>
+            <p id="ivSlowSummary"></p>
         </div>
-
-        <div class="vd-chips" id="ivChips">
-            <button type="button" class="vd-chip active" data-filter="all">All <span id="ivcAll">0</span></button>
-            <button type="button" class="vd-chip" data-filter="in">In Stock <span id="ivcIn">0</span></button>
-            <button type="button" class="vd-chip" data-filter="low">Low <span id="ivcLow">0</span></button>
-            <button type="button" class="vd-chip" data-filter="out">Out <span id="ivcOut">0</span></button>
-            <button type="button" class="vd-chip" data-filter="slow">Slow <span id="ivcSlow">0</span></button>
-            <button type="button" class="vd-chip" data-filter="inactive">Inactive <span id="ivcInactive">0</span></button>
+        <div class="iv-hero-stats">
+            <div><b id="slowCount">0</b><span>products idle</span></div>
+            <div><b id="slowStuck">0</b><span>money stuck (cost)</span></div>
+            <div><b id="slowRecover">0</b><span>you get back</span></div>
         </div>
-
-        <select class="vd-sort" id="ivCat"></select>
-
-        <select class="vd-sort" id="ivSort">
-            <option value="name">Sort: Name</option>
-            <option value="stock">Sort: Lowest stock</option>
-            <option value="value">Sort: Highest value</option>
-            <option value="sold">Sort: Best selling</option>
-        </select>
     </div>
 
-    <div class="vd-table-wrap">
-        <table class="vd-table">
-            <thead>
-                <tr>
-                    <th>Product</th>
-                    <th>Stock</th>
-                    <th>Price</th>
-                    <th>Stock Value</th>
-                    <th>Status</th>
-                    <th></th>
-                </tr>
-            </thead>
-            <tbody id="ivRows"></tbody>
-        </table>
+    <div class="vd-panel iv-mb">
+        <div class="iv-box-body">
+            <div class="iv-disc">
+                <span>Clearance discount</span>
+                <div class="iv-disc-btns" id="ivDisc">
+                    <button type="button" data-disc="10">10%</button>
+                    <button type="button" data-disc="20" class="active">20%</button>
+                    <button type="button" data-disc="30">30%</button>
+                    <button type="button" data-disc="40">40%</button>
+                </div>
+            </div>
+            <div id="ivAging"></div>
+        </div>
     </div>
+
+    <div class="iv-slow-list" id="ivSlowList"></div>
 </div>
 
 <!-- ===== Detail side panel ===== -->
@@ -305,5 +385,7 @@
 </div>
 
 <div class="vd-toast" id="ivToast"></div>
+
+</div>
 
 @endsection

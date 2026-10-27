@@ -114,6 +114,7 @@ class InventoryController extends Controller
                     'daysLeft' => $daysLeft,
                     'suggest' => $suggest,
                     'lastSold' => $lastSold,
+                    'idleSince' => $lastSold ?: $p->created_at->toDateString(),
                     'dead' => $dead,
                     'revenue' => $revenue,
                     'movements' => array_slice($moves, 0, 30),
@@ -123,29 +124,54 @@ class InventoryController extends Controller
         return response()->json($products);
     }
 
+    // Light numbers for the sidebar badge
     public function summary()
-{
-    $products = Product::where('active', true)
-        ->withSum('purchaseItems as purchased', 'qty')
-        ->withSum('invoiceItems as sold', 'qty')
-        ->withSum('adjustments as adjusted', 'qty')
-        ->get();
+    {
+        $products = Product::where('active', true)
+            ->withSum('purchaseItems as purchased', 'qty')
+            ->withSum('invoiceItems as sold', 'qty')
+            ->withSum('adjustments as adjusted', 'qty')
+            ->get();
 
-    $low = 0;
-    $out = 0;
+        $low = 0;
+        $out = 0;
 
-    foreach ($products as $p) {
-        $stock = $p->opening_stock + (float) $p->purchased - (float) $p->sold + (float) $p->adjusted;
+        foreach ($products as $p) {
+            $stock = $p->opening_stock + (float) $p->purchased - (float) $p->sold + (float) $p->adjusted;
 
-        if ($stock <= 0) {
-            $out++;
-        } elseif ($p->reorder_level > 0 && $stock <= $p->reorder_level) {
-            $low++;
+            if ($stock <= 0) {
+                $out++;
+            } elseif ($p->reorder_level > 0 && $stock <= $p->reorder_level) {
+                $low++;
+            }
         }
+
+        return response()->json(['low' => $low, 'out' => $out, 'attention' => $low + $out]);
     }
 
-    return response()->json(['low' => $low, 'out' => $out, 'attention' => $low + $out]);
-}
+    // Product list for the invoice item picker
+    public function options()
+    {
+        $products = Product::where('active', true)
+            ->withSum('purchaseItems as purchased', 'qty')
+            ->withSum('invoiceItems as sold', 'qty')
+            ->withSum('adjustments as adjusted', 'qty')
+            ->orderBy('name')
+            ->get()
+            ->map(function ($p) {
+                return [
+                    'id' => $p->id,
+                    'name' => $p->name,
+                    'unit' => $p->unit,
+                    'cost' => $p->cost_price,
+                    'sale' => $p->sale_price,
+                    'stock' => round($p->opening_stock + (float) $p->purchased - (float) $p->sold + (float) $p->adjusted, 4),
+                ];
+            });
+
+        return response()->json($products);
+    }
+
     public function store(Request $request)
     {
         $data = $request->validate($this->rules());

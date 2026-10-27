@@ -1,13 +1,13 @@
 var customers = [];
 
-var nextId = 7;
 var currentFilter = 'all';
 var editingId = null;
 var openId = null;
 var menuId = null;
+var receiveId = null;
 var avatarColors = ['#0f766e', '#6d28d9', '#c2410c', '#be123c', '#1d4ed8', '#0e7490'];
 
-// ---------- Chhote helper functions ----------
+// ---------- Small helper functions ----------
 function $(id) { return document.getElementById(id); }
 
 function esc(text) {
@@ -18,11 +18,44 @@ function esc(text) {
 
 function money(n) { return formatMoney(Math.abs(n)); }
 
+function round2(n) { return Math.round(n * 100) / 100; }
+
+function localToday() {
+    var d = new Date();
+    return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Send JSON to Laravel. If the server says no, the error message is thrown
+function sendJson(method, url, body) {
+    return fetch(url, {
+        method: method,
+        headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
+        },
+        body: JSON.stringify(body)
+    }).then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (data) {
+            if (!res.ok) {
+                var keys = Object.keys(data.errors || {});
+                throw new Error(keys.length ? data.errors[keys[0]][0] : (data.message || 'Request failed'));
+            }
+            return data;
+        });
+    });
+}
+
 // Balance = opening + debit - credit. Plus = receivable, minus = payable
 function balanceOf(c) {
     var b = c.opening;
     c.ledger.forEach(function (e) { b += e.debit - e.credit; });
     return b;
+}
+
+// Total still unpaid on this customer's invoices
+function unpaidTotal(c) {
+    return round2(c.invoices.reduce(function (s, i) { return s + (i.balance || 0); }, 0));
 }
 
 function usedPercent(c) {
@@ -134,7 +167,7 @@ function renderAll() {
     if (openId) openPanel(openId, true);
 }
 
-// ---------- 3 dots ka menu ----------
+// ---------- 3 dots menu ----------
 var menu = document.createElement('div');
 menu.className = 'cust-menu';
 menu.style.display = 'none';
@@ -157,6 +190,7 @@ function openMenu(btn, c) {
     var html = '';
     html += menuButton('invoice', 'fa-solid fa-file-invoice', 'Create Invoice');
     html += menuButton('payment', 'fa-solid fa-money-bill-wave', 'Receive Payment');
+    html += menuButton('statement', 'fa-solid fa-print', 'Statement');
     html += '<div class="cust-menu-sep"></div>';
     html += menuLink(waLink(c), 'fa-brands fa-whatsapp', 'WhatsApp', true);
     html += menuLink('tel:' + c.phone.replace(/\s/g, ''), 'fa-solid fa-phone', 'Call');
@@ -188,30 +222,23 @@ menu.addEventListener('click', function (e) {
     var c = findCustomer(menuId);
     closeMenu();
 
-    if (!action || !c) return; // WhatsApp / Call links khud khulte hain
+    if (!action || !c) return; // WhatsApp / Call links open by themselves
 
-    if (action === 'edit') openModal(c.id);
-    else if (action === 'toggle') {
+    if (action === 'edit') {
+        openModal(c.id);
+    } else if (action === 'toggle') {
         var newState = !c.active;
-        fetch('/customers/' + c.id, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify({ active: newState })
-        })
-        .then(function (res) {
-            if (!res.ok) throw new Error('failed');
-            toast(newState ? 'Customer is activated' : 'Customer is inactivated');
-            loadCustomers();
-        })
-        .catch(function () {
-            toast('Could not change status');
-        });
+        sendJson('PUT', '/customers/' + c.id, { active: newState })
+            .then(function () {
+                toast(newState ? 'Customer is activated' : 'Customer is inactivated');
+                loadCustomers();
+            })
+            .catch(function () {
+                toast('Could not change status');
+            });
+    } else {
+        runAction(action, c);
     }
-     else placeholderAction(action);
 });
 
 document.addEventListener('click', function (e) {
@@ -248,7 +275,7 @@ function openPanel(id, keepTab) {
             '<td class="r">' + (e.credit ? money(e.credit) : '-') + '</td>' +
             '<td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
     });
-    if (!ledgerRows) ledgerRows = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">Abhi koi entry nahi.</td></tr>';
+    if (!ledgerRows) ledgerRows = '<tr><td colspan="5" style="text-align:center;color:var(--muted);padding:20px;">No entries yet.</td></tr>';
 
     // Invoice rows
     var invRows = '';
@@ -256,7 +283,7 @@ function openPanel(id, keepTab) {
         var cls = i.status === 'Paid' ? 'b-green' : (i.status === 'Partial' ? 'b-amber' : 'b-red');
         invRows += '<tr><td>' + esc(i.no) + '</td><td>' + esc(i.date) + '</td><td class="r">' + money(i.amount) + '</td><td class="r"><span class="badge ' + cls + '">' + i.status + '</span></td></tr>';
     });
-    if (!invRows) invRows = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">Abhi koi invoice nahi.</td></tr>';
+    if (!invRows) invRows = '<tr><td colspan="4" style="text-align:center;color:var(--muted);padding:20px;">No invoices yet.</td></tr>';
 
     $('panel-body').innerHTML =
         '<div class="p-head">' + avatarOf(c, true) +
@@ -285,7 +312,7 @@ function openPanel(id, keepTab) {
             '</div>' +
             '<div class="p-pane" id="pane-ledger">' +
                 '<table class="mini-table"><thead><tr><th>Date</th><th>Details</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead><tbody>' + ledgerRows + '</tbody></table>' +
-                '<p style="font-size:11px;color:var(--muted);margin-top:10px;">Debit = bill banaya, Credit = paisa mila ya wapsi. Cr = humne dena hai.</p>' +
+                '<p style="font-size:11px;color:var(--muted);margin-top:10px;">Debit = invoice created. Credit = payment received or returned. Cr = we owe them.</p>' +
             '</div>' +
             '<div class="p-pane" id="pane-invoices">' +
                 '<table class="mini-table"><thead><tr><th>No</th><th>Date</th><th class="r">Amount</th><th class="r">Status</th></tr></thead><tbody>' + invRows + '</tbody></table>' +
@@ -360,59 +387,181 @@ function saveCustomer() {
     };
 
     if (editingId) {
-        fetch('/customers/' + editingId, {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify(data)
-        })
-        .then(function (res) {
-            if (!res.ok) throw new Error('update failed');
-            return res.json();
-        })
-        .then(function () {
-            toast('Customer is updated');
-            closeModal();
-            loadCustomers();
-        })
-        .catch(function () {
-            $('form-error').textContent = 'Could not update. Please check the details.';
-        });
+        sendJson('PUT', '/customers/' + editingId, data)
+            .then(function () {
+                toast('Customer is updated');
+                closeModal();
+                loadCustomers();
+            })
+            .catch(function () {
+                $('form-error').textContent = 'Could not update. Please check the details.';
+            });
     } else {
-        fetch('/customers', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').content
-            },
-            body: JSON.stringify(data)
-        })
-        .then(function (res) {
-            if (!res.ok) throw new Error('save failed');
-            return res.json();
-        })
-        .then(function () {
-            toast('New customer added');
-            closeModal();
-            loadCustomers();
-        })
-        .catch(function () {
-            $('form-error').textContent = 'Could not save. Please check the details.';
-        });
+        sendJson('POST', '/customers', data)
+            .then(function () {
+                toast('New customer added');
+                closeModal();
+                loadCustomers();
+            })
+            .catch(function () {
+                $('form-error').textContent = 'Could not save. Please check the details.';
+            });
     }
 }
 
-// ---------- Buttons aur clicks ----------
-function placeholderAction(kind) {
-    if (kind === 'invoice') toast('Invoice Invoices page se banega (abhi jura nahi)');
-    if (kind === 'payment') toast('Payment ka form baad mein jurega');
-    if (kind === 'statement') toast('Statement print baad mein jurega');
+// =====================================================
+//  The 3 buttons: Create Invoice, Receive Payment, Statement
+// =====================================================
+function runAction(kind, c) {
+    if (!c) return;
+
+    if (kind === 'invoice') { window.location.href = '/invoices?customer=' + c.id; }
+    else if (kind === 'payment') { openReceive(c); }
+    else if (kind === 'statement') { printStatement(c); }
 }
 
+// ---------- Receive Payment popup (built here, no blade change needed) ----------
+var recvModal = document.createElement('div');
+recvModal.className = 'modal-back';
+recvModal.innerHTML =
+    '<div class="modal-box" style="max-width:420px;">' +
+        '<div class="modal-top"><h3>Receive Payment</h3>' +
+            '<button class="icon-x" id="recv-close"><i class="fa-solid fa-xmark"></i></button></div>' +
+        '<p class="cust-sub" id="recv-info" style="margin-bottom:12px;"></p>' +
+        '<div class="form-grid" style="grid-template-columns:1fr;">' +
+            '<div><label>Amount received</label><input type="number" id="recv-amount" min="0" step="any"></div>' +
+            '<div><label>Date</label><input type="date" id="recv-date"></div>' +
+        '</div>' +
+        '<p class="form-error" id="recv-error"></p>' +
+        '<div class="modal-foot">' +
+            '<button class="btn-ghost" id="recv-cancel">Cancel</button>' +
+            '<button class="btn-main" id="recv-save">Save Payment</button>' +
+        '</div>' +
+    '</div>';
+document.body.appendChild(recvModal);
+
+function closeReceive() { recvModal.classList.remove('show'); }
+
+function openReceive(c) {
+    var due = unpaidTotal(c);
+
+    if (due <= 0) {
+        toast('This customer has no unpaid invoices');
+        return;
+    }
+
+    receiveId = c.id;
+    $('recv-info').innerHTML = esc(c.name) + '<br>Unpaid invoices total: <b>' + money(due) + '</b>. The oldest invoice is paid first.';
+    $('recv-amount').value = due;
+    $('recv-date').value = localToday();
+    $('recv-error').textContent = '';
+
+    recvModal.classList.add('show');
+    $('recv-amount').focus();
+}
+
+function saveReceive() {
+    var c = findCustomer(receiveId);
+    if (!c) return;
+
+    var due = unpaidTotal(c);
+    var amount = parseFloat($('recv-amount').value);
+    var date = $('recv-date').value;
+
+    if (isNaN(amount) || amount <= 0) { $('recv-error').textContent = 'Enter an amount more than 0.'; return; }
+    if (amount > due + 0.005) { $('recv-error').textContent = 'Amount cannot be more than the unpaid total (' + money(due) + ').'; return; }
+    if (!date) { $('recv-error').textContent = 'Choose the date.'; return; }
+    if (date > localToday()) { $('recv-error').textContent = 'Date cannot be in the future.'; return; }
+
+    $('recv-save').disabled = true;
+
+    sendJson('POST', '/customers/' + c.id + '/receive', { amount: round2(amount), date: date })
+        .then(function () {
+            closeReceive();
+            toast('Payment of ' + money(amount) + ' received');
+            loadCustomers();
+        })
+        .catch(function (err) {
+            $('recv-error').textContent = err.message || 'Could not save the payment.';
+        })
+        .then(function () { $('recv-save').disabled = false; });
+}
+
+$('recv-save').addEventListener('click', saveReceive);
+$('recv-close').addEventListener('click', closeReceive);
+$('recv-cancel').addEventListener('click', closeReceive);
+recvModal.addEventListener('click', function (e) { if (e.target === recvModal) closeReceive(); });
+
+// ---------- Statement (opens a clean page and prints) ----------
+function printStatement(c) {
+    var win = window.open('', '_blank');
+    if (!win) { toast('Allow pop-ups to see the statement'); return; }
+
+    win.document.write('<p style="font-family:sans-serif;padding:20px;">Preparing statement...</p>');
+
+    fetch('/company/info', { headers: { 'Accept': 'application/json' } })
+        .then(function (res) { return res.json(); })
+        .catch(function () { return {}; })
+        .then(function (co) {
+            var running = c.opening;
+            var rows = '';
+
+            if (c.opening !== 0) {
+                rows += '<tr><td>-</td><td>Opening balance</td><td class="r">-</td><td class="r">-</td><td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
+            }
+            c.ledger.forEach(function (e) {
+                running += e.debit - e.credit;
+                rows += '<tr><td>' + esc(e.date) + '</td><td>' + esc(e.desc) + '</td>' +
+                    '<td class="r">' + (e.debit ? money(e.debit) : '-') + '</td>' +
+                    '<td class="r">' + (e.credit ? money(e.credit) : '-') + '</td>' +
+                    '<td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
+            });
+            if (!rows) { rows = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px;">No entries yet.</td></tr>'; }
+
+            var b = balanceOf(c);
+            var closing = b > 0 ? 'Balance due from customer: <b>' + money(b) + '</b>'
+                : (b < 0 ? 'We owe the customer: <b>' + money(b) + '</b>' : 'Account is clear: <b>' + money(0) + '</b>');
+
+            var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Statement - ' + esc(c.name) + '</title>' +
+                '<style>' +
+                'body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:0;padding:28px;font-size:13px;}' +
+                '.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:18px;}' +
+                '.co{font-size:20px;font-weight:700;color:#0f766e;}' +
+                '.small{color:#64748b;font-size:12px;line-height:1.6;}' +
+                '.title{font-size:22px;font-weight:700;text-align:right;}' +
+                '.cust{background:#f1f5f9;border-radius:8px;padding:12px 14px;margin-bottom:16px;line-height:1.6;}' +
+                'table{width:100%;border-collapse:collapse;}' +
+                'th{background:#0f766e;color:#fff;text-align:left;padding:8px;font-size:12px;}' +
+                'td{padding:8px;border-bottom:1px solid #e2e8f0;}' +
+                '.r{text-align:right;}' +
+                '.close{margin-top:16px;text-align:right;font-size:15px;}' +
+                '.note{margin-top:26px;color:#94a3b8;font-size:11px;text-align:center;}' +
+                '@media print{body{padding:10px;}}' +
+                '</style></head><body>' +
+                '<div class="top">' +
+                    '<div><div class="co">' + esc(co.name || 'Your Company') + '</div>' +
+                        '<div class="small">' + esc(co.address || '') + '<br>' + esc(co.phone || '') + '</div></div>' +
+                    '<div><div class="title">STATEMENT</div>' +
+                        '<div class="small" style="text-align:right;">Date: ' + localToday() + '</div></div>' +
+                '</div>' +
+                '<div class="cust"><b>' + esc(c.name) + '</b><br>' +
+                    esc(c.phone) + (c.city ? ' - ' + esc(c.city) : '') +
+                    (c.address ? '<br>' + esc(c.address) : '') + '</div>' +
+                '<table><thead><tr><th>Date</th><th>Details</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead>' +
+                    '<tbody>' + rows + '</tbody></table>' +
+                '<div class="close">' + closing + '</div>' +
+                '<div class="note">Debit = invoice created. Credit = payment received. Cr = we owe the customer.</div>' +
+                '</body></html>';
+
+            win.document.open();
+            win.document.write(html);
+            win.document.close();
+            win.focus();
+            setTimeout(function () { win.print(); }, 400);
+        });
+}
+
+// ---------- Buttons and clicks ----------
 $('cust-body').addEventListener('click', function (e) {
     var row = e.target.closest('tr');
     if (!row) return;
@@ -432,7 +581,7 @@ $('panel').addEventListener('click', function (e) {
     var tab = e.target.closest('.p-tab');
     if (tab) showTab(tab.dataset.pane);
     var pa = e.target.closest('[data-pact]');
-    if (pa) placeholderAction(pa.dataset.pact);
+    if (pa) runAction(pa.dataset.pact, findCustomer(openId));
 });
 
 $('overlay').addEventListener('click', closePanel);
@@ -454,7 +603,7 @@ document.querySelectorAll('.filter-btn').forEach(function (b) {
 });
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeMenu(); closeModal(); closePanel(); }
+    if (e.key === 'Escape') { closeMenu(); closeModal(); closeReceive(); closePanel(); }
 });
 
 function loadCustomers() {
