@@ -103,39 +103,26 @@ function loadCompany() {
 function loadProducts() {
     return api('GET', '/inventory/options').then(function (data) {
         productsList = data;
-        $('inv-products').innerHTML = data.map(function (p) {
-            return '<option value="' + esc(p.name) + '" label="' + esc(num(p.stock) + ' ' + p.unit + ' in stock') + '"></option>';
-        }).join('');
     });
 }
 
-function productByName(name) {
-    var n = name.trim().toLowerCase();
-    if (!n) return null;
-    return productsList.filter(function (p) { return p.name.toLowerCase() === n; })[0] || null;
+function productById(id) {
+    return productsList.filter(function (p) { return p.id === Number(id); })[0] || null;
 }
 
-function syncRow(row, nameChanged) {
-    var priceEl = row.querySelector('.it-price');
+// Stock and price hint under an item row
+function syncRow(row) {
     var hint = row.querySelector('.it-stock');
-    var p = productByName(row.querySelector('.it-name').value);
+    var p = productById(row._picker.get());
 
     if (!p) {
-        delete row.dataset.product;
         hint.textContent = '';
         hint.className = 'it-stock';
         return;
     }
 
-    row.dataset.product = p.id;
-
-    if (nameChanged && (priceEl.value.trim() === '' || priceEl.value === row.dataset.auto)) {
-        priceEl.value = p.sale;
-        row.dataset.auto = String(p.sale);
-    }
-
     var qty = parseFloat(row.querySelector('.it-qty').value) || 0;
-    var price = parseFloat(priceEl.value);
+    var price = parseFloat(row.querySelector('.it-price').value);
     var text = num(p.stock) + ' ' + p.unit + ' in stock';
     var warn = false;
 
@@ -186,7 +173,7 @@ function billInner(inv) {
     var t = totals(inv);
     var rows = '';
     inv.items.forEach(function (i) {
-        rows += '<tr><td>' + esc(i.name || '-') + '</td><td class="r">' + i.qty + '</td><td class="r">' + money(i.price) + '</td><td class="r">' + money(i.qty * i.price) + '</td></tr>';
+        rows += '<tr><td>' + esc(i.name || '-') + (i.description ? '<div class="bill-small">' + esc(i.description) + '</div>' : '') + '</td><td class="r">' + i.qty + '</td><td class="r">' + money(i.price) + '</td><td class="r">' + money(i.qty * i.price) + '</td></tr>';
     });
     if (!rows) rows = '<tr><td colspan="4" style="text-align:center;color:#94a3b8;padding:18px;">Items will be shown here</td></tr>';
 
@@ -451,19 +438,35 @@ function confirmDelete() {
 function addItemRow() {
     var row = document.createElement('div');
     row.className = 'item-row';
-    row.innerHTML = '<input class="it-name" type="text" list="inv-products" placeholder="Item name" autocomplete="off">' +
+    row.innerHTML = '<div class="it-pick"></div>' +
         '<input class="it-qty" type="number" value="1" min="1">' +
         '<input class="it-price" type="number" placeholder="Price">' +
         '<button type="button" class="it-del"><i class="fa-solid fa-xmark"></i></button>' +
+        '<input class="it-desc" type="text" placeholder="Description (optional)" maxlength="200">' +
         '<small class="it-stock"></small>';
+
+    row._picker = ProductPicker.create({
+        mode: 'sale',
+        products: function () { return productsList; },
+        onSelect: function (p) {
+            row.querySelector('.it-price').value = p.sale;
+            syncRow(row);
+            setErr('items', '');
+            updatePreview();
+        }
+    });
+
+    row.querySelector('.it-pick').appendChild(row._picker.el);
     $('items').appendChild(row);
 }
 
 function readItems() {
     var list = [];
     document.querySelectorAll('#items .item-row').forEach(function (row) {
+        var p = productById(row._picker.get());
         list.push({
-            name: row.querySelector('.it-name').value.trim(),
+            name: p ? p.name : '',
+            description: row.querySelector('.it-desc').value.trim(),
             qty: parseFloat(row.querySelector('.it-qty').value) || 0,
             price: parseFloat(row.querySelector('.it-price').value) || 0
         });
@@ -527,22 +530,32 @@ function validateNew() {
     // Items (completely empty rows are ignored, the rest are checked)
     var items = [];
     var itemMsg = '';
+    var used = {};
     document.querySelectorAll('#items .item-row').forEach(function (row) {
-        var nameEl = row.querySelector('.it-name');
+        var pid = row._picker.get();
         var qtyEl = row.querySelector('.it-qty');
         var priceEl = row.querySelector('.it-price');
-        var name = nameEl.value.trim();
+        var desc = row.querySelector('.it-desc').value.trim();
         var priceRaw = priceEl.value.trim();
 
-        if (!name && priceRaw === '') return;
+        if (!pid && priceRaw === '' && !desc) return;
 
+        var p = productById(pid);
         var qty = parseFloat(qtyEl.value);
         var price = parseFloat(priceRaw);
 
-        if (!name) { nameEl.classList.add('is-invalid'); itemMsg = 'Every item needs a name'; }
+        if (!p) { row._picker.el.classList.add('is-invalid'); itemMsg = 'Choose a product for every item'; }
         else if (isNaN(qty) || qty <= 0) { qtyEl.classList.add('is-invalid'); itemMsg = 'Quantity must be more than 0'; }
-        else if (isNaN(price) || price <= 0) { priceEl.classList.add('is-invalid'); itemMsg = 'Enter a price more than 0 for "' + name + '"'; }
-        else { items.push({ name: name, qty: qty, price: price, product_id: row.dataset.product ? Number(row.dataset.product) : null }); }
+        else if (isNaN(price) || price <= 0) { priceEl.classList.add('is-invalid'); itemMsg = 'Enter a price more than 0 for "' + p.name + '"'; }
+        else {
+            used[p.id] = (used[p.id] || 0) + qty;
+            if (used[p.id] > p.stock) {
+                qtyEl.classList.add('is-invalid');
+                itemMsg = 'Only ' + num(p.stock) + ' ' + p.unit + ' of "' + p.name + '" in stock';
+            } else {
+                items.push({ product_id: p.id, description: desc, qty: qty, price: price });
+            }
+        }
     });
     if (!itemMsg && !items.length) { itemMsg = 'Add at least one item'; }
     if (itemMsg) { setErr('items', itemMsg); ok = false; }
@@ -608,8 +621,8 @@ function onFormEdit(e) {
     if (e.target.closest('#items')) { setErr('items', ''); }
 
     var itemRow = e.target.closest('.item-row');
-    if (itemRow && (e.target.classList.contains('it-name') || e.target.classList.contains('it-qty') || e.target.classList.contains('it-price'))) {
-        syncRow(itemRow, e.target.classList.contains('it-name'));
+    if (itemRow && (e.target.classList.contains('it-qty') || e.target.classList.contains('it-price'))) {
+        syncRow(itemRow);
     }
 
     updatePreview();

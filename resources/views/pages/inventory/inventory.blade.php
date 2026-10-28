@@ -5,6 +5,7 @@
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/vendors/vendors.css') }}">
 <link rel="stylesheet" href="{{ asset('css/inventory/inventory.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
@@ -235,67 +236,86 @@
         </div>
 
         <div class="vd-modal-body">
-            <div class="vd-grid">
-                <div class="vd-field">
-                    <label>Product Name <span class="vd-req">*</span></label>
-                    <input type="text" class="vd-input" id="fiName" maxlength="80" placeholder="e.g. Steel rod 10mm">
-                    <small class="vd-err" data-err="fiName"></small>
+
+            <div class="iv-form-top">
+                <!-- Picture -->
+                <div class="iv-pic">
+                    <div class="iv-pic-box" id="fiPicBox" title="Choose a picture">
+                        <img id="fiPreview" alt="Product picture">
+                        <i class="fa-regular fa-image iv-pic-empty"></i>
+                    </div>
+                    <div class="iv-pic-actions">
+                        <button type="button" class="vd-btn-ghost vd-small" id="fiPicChoose">Choose picture</button>
+                        <button type="button" class="vd-btn-ghost vd-small" id="fiPicRemove">Remove</button>
+                    </div>
+                    <input type="file" id="fiFile" accept="image/png,image/jpeg,image/webp" hidden>
+                    <small class="vd-err" data-err="fiFile"></small>
                 </div>
 
-                <div class="vd-field">
-                    <label>SKU / Code</label>
-                    <input type="text" class="vd-input" id="fiSku" maxlength="40" placeholder="Optional">
-                    <small class="vd-err" data-err="fiSku"></small>
-                </div>
+                <!-- Main fields -->
+                <div class="vd-grid">
+                    <div class="vd-field vd-full">
+                        <label>Product Name <span class="vd-req">*</span></label>
+                        <input type="text" class="vd-input" id="fiName" maxlength="80" placeholder="e.g. Steel rod 10mm">
+                        <small class="vd-err" data-err="fiName"></small>
+                    </div>
 
-                <div class="vd-field">
-                    <label>Category</label>
-                    <input type="text" class="vd-input" id="fiCategory" list="ivCategories" maxlength="40" placeholder="General">
-                </div>
+                    <div class="vd-field">
+                        <label>Unit</label>
+                        <input type="text" class="vd-input" id="fiUnit" list="ivUnits" maxlength="20" placeholder="pcs">
+                    </div>
 
-                <div class="vd-field">
-                    <label>Unit</label>
-                    <input type="text" class="vd-input" id="fiUnit" list="ivUnits" maxlength="20" placeholder="pcs">
+                    <div class="vd-field">
+                        <label>Sale Price (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
+                        <input type="number" class="vd-input" id="fiSale" min="0" step="any" placeholder="0">
+                        <small class="vd-hint" id="fiMargin"></small>
+                        <small class="vd-err" data-err="fiSale"></small>
+                    </div>
                 </div>
+            </div>
 
-                <div class="vd-field">
-                    <label>Cost Price (<span class="cur-sym">Rs</span>)</label>
-                    <input type="number" class="vd-input" id="fiCost" min="0" step="any" placeholder="0">
-                    <small class="vd-err" data-err="fiCost"></small>
-                </div>
+            <!-- More details (hidden until opened) -->
+            <button type="button" class="iv-more-toggle" id="ivMoreToggle"><i class="fa-solid fa-chevron-down"></i> More details</button>
 
-                <div class="vd-field">
-                    <label>Sale Price (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
-                    <input type="number" class="vd-input" id="fiSale" min="0" step="any" placeholder="0">
-                    <small class="vd-hint" id="fiMargin"></small>
-                    <small class="vd-err" data-err="fiSale"></small>
-                </div>
+            <div class="iv-more" id="ivMore" style="display:none">
+                <div class="vd-grid">
+                    <div class="vd-field">
+                        <label>Code (SKU)</label>
+                        <input type="text" class="vd-input" id="fiSku" maxlength="40" placeholder="Made automatically, e.g. PRD-0001">
+                        <small class="vd-err" data-err="fiSku"></small>
+                    </div>
 
-                <div class="vd-field">
-                    <label>Opening Stock</label>
-                    <input type="number" class="vd-input" id="fiOpening" min="0" step="any" placeholder="0">
-                    <small class="vd-hint">Stock you already have today</small>
-                    <small class="vd-err" data-err="fiOpening"></small>
-                </div>
+                    <div class="vd-field">
+                        <label>Category</label>
+                        <input type="text" class="vd-input" id="fiCategory" list="ivCategories" maxlength="40" placeholder="General">
+                    </div>
 
-                <div class="vd-field">
-                    <label>Reorder Level</label>
-                    <input type="number" class="vd-input" id="fiReorder" min="0" step="any" placeholder="0">
-                    <small class="vd-hint">You are warned when stock falls to this number</small>
-                    <small class="vd-err" data-err="fiReorder"></small>
-                </div>
+                    <div class="vd-field">
+                        <label>Cost Price (<span class="cur-sym">Rs</span>)</label>
+                        <input type="number" class="vd-input" id="fiCost" min="0" step="any" placeholder="0">
+                        <small class="vd-hint">Changes by itself when you make a purchase</small>
+                        <small class="vd-err" data-err="fiCost"></small>
+                    </div>
 
-                <div class="vd-field">
-                    <label>Status</label>
-                    <select class="vd-input" id="fiStatus">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
-                </div>
+                    <div class="vd-field">
+                        <label>Reorder Level</label>
+                        <input type="number" class="vd-input" id="fiReorder" min="0" step="any" placeholder="0">
+                        <small class="vd-hint">You are warned when stock falls to this number</small>
+                        <small class="vd-err" data-err="fiReorder"></small>
+                    </div>
 
-                <div class="vd-field vd-full">
-                    <label>Notes</label>
-                    <textarea class="vd-input" id="fiNotes" rows="2" maxlength="300" placeholder="Optional"></textarea>
+                    <div class="vd-field">
+                        <label>Status</label>
+                        <select class="vd-input" id="fiStatus">
+                            <option value="active">Active</option>
+                            <option value="inactive">Inactive</option>
+                        </select>
+                    </div>
+
+                    <div class="vd-field vd-full">
+                        <label>Notes</label>
+                        <textarea class="vd-input" id="fiNotes" rows="2" maxlength="300" placeholder="Optional"></textarea>
+                    </div>
                 </div>
             </div>
 

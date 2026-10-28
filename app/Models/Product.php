@@ -7,7 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 class Product extends Model
 {
     use \App\Models\Concerns\Auditable;
-    protected $fillable = ['name', 'sku', 'category', 'unit', 'cost_price', 'sale_price', 'opening_stock', 'reorder_level', 'active', 'notes'];
+    protected $fillable = ['name', 'sku', 'category', 'unit', 'cost_price', 'sale_price', 'opening_stock', 'reorder_level', 'active', 'notes', 'image'];
 
     protected $casts = [
         'cost_price' => 'float',

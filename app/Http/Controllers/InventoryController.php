@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Product;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Schema;
 
 class InventoryController extends Controller
 {
@@ -14,14 +15,15 @@ class InventoryController extends Controller
         return [
             'name' => 'required|string|max:255|unique:products,name' . $ignore,
             'sku' => 'nullable|string|max:100|unique:products,sku' . $ignore,
-            'category' => 'required|string|max:100',
-            'unit' => 'required|string|max:30',
-            'cost' => 'required|numeric|min:0',
+            'category' => 'nullable|string|max:100',
+            'unit' => 'nullable|string|max:30',
+            'cost' => 'nullable|numeric|min:0',
             'sale' => 'required|numeric|min:0',
-            'opening' => 'required|numeric|min:0',
-            'reorder' => 'required|numeric|min:0',
+            'reorder' => 'nullable|numeric|min:0',
             'active' => 'sometimes|boolean',
             'notes' => 'nullable|string|max:300',
+            'image' => 'nullable|string|max:2000000',
+            'remove_image' => 'sometimes|boolean',
         ];
     }
 
@@ -30,12 +32,11 @@ class InventoryController extends Controller
         $out = [
             'name' => $d['name'],
             'sku' => $d['sku'] ?? null,
-            'category' => $d['category'],
-            'unit' => $d['unit'],
-            'cost_price' => $d['cost'],
+            'category' => $d['category'] ?? 'General',
+            'unit' => $d['unit'] ?? 'pcs',
+            'cost_price' => $d['cost'] ?? 0,
             'sale_price' => $d['sale'],
-            'opening_stock' => $d['opening'],
-            'reorder_level' => $d['reorder'],
+            'reorder_level' => $d['reorder'] ?? 0,
             'notes' => $d['notes'] ?? null,
         ];
 
@@ -44,6 +45,73 @@ class InventoryController extends Controller
         }
 
         return $out;
+    }
+
+    // Remember who created the record (if the column exists)
+    private function stamp($model)
+    {
+        if (Schema::hasColumn($model->getTable(), 'created_by')) {
+            $model->forceFill(['created_by' => auth()->id()])->save();
+        }
+    }
+
+    // ---------- Product picture (saved as a file in public/uploads/products) ----------
+    private function readImage($dataUrl)
+    {
+        if (!is_string($dataUrl) || !preg_match('/^data:image\/(png|jpeg|webp);base64,/', $dataUrl, $m)) {
+            return null;
+        }
+
+        $binary = base64_decode(substr($dataUrl, strpos($dataUrl, ',') + 1), true);
+
+        if ($binary === false || strlen($binary) === 0 || strlen($binary) > 1500000) {
+            return null;
+        }
+
+        $info = @getimagesizefromstring($binary);
+        $mimes = ['png' => 'image/png', 'jpeg' => 'image/jpeg', 'webp' => 'image/webp'];
+
+        if (!$info || $info['mime'] !== $mimes[$m[1]]) {
+            return null;
+        }
+
+        $ext = ['png' => 'png', 'jpeg' => 'jpg', 'webp' => 'webp'][$m[1]];
+
+        return ['binary' => $binary, 'ext' => $ext];
+    }
+
+    private function badImage()
+    {
+        $msg = 'This picture is not valid. Use a PNG, JPG or WebP image.';
+
+        return response()->json(['message' => $msg, 'errors' => ['image' => [$msg]]], 422);
+    }
+
+    private function deleteImageFile($path)
+    {
+        if ($path && strpos($path, 'uploads/products/') === 0 && strpos($path, '..') === false) {
+            $full = public_path($path);
+
+            if (is_file($full)) {
+                @unlink($full);
+            }
+        }
+    }
+
+    private function attachImage(Product $product, array $image)
+    {
+        $dir = public_path('uploads/products');
+
+        if (!is_dir($dir)) {
+            mkdir($dir, 0755, true);
+        }
+
+        $this->deleteImageFile($product->image);
+
+        $name = 'p' . $product->id . '-' . time() . '.' . $image['ext'];
+        file_put_contents($dir . '/' . $name, $image['binary']);
+
+        $product->update(['image' => 'uploads/products/' . $name]);
     }
 
     public function index()
@@ -99,6 +167,7 @@ class InventoryController extends Controller
                     'sku' => $p->sku ?? '',
                     'category' => $p->category,
                     'unit' => $p->unit,
+                    'image' => $p->image ? asset($p->image) : '',
                     'cost' => $p->cost_price,
                     'sale' => $p->sale_price,
                     'opening' => $p->opening_stock,
@@ -149,7 +218,7 @@ class InventoryController extends Controller
         return response()->json(['low' => $low, 'out' => $out, 'attention' => $low + $out]);
     }
 
-    // Product list for the invoice item picker
+    // Product list for the invoice and purchase item pickers
     public function options()
     {
         $products = Product::where('active', true)
@@ -162,7 +231,10 @@ class InventoryController extends Controller
                 return [
                     'id' => $p->id,
                     'name' => $p->name,
+                    'sku' => $p->sku ?? '',
+                    'category' => $p->category,
                     'unit' => $p->unit,
+                    'image' => $p->image ? asset($p->image) : '',
                     'cost' => $p->cost_price,
                     'sale' => $p->sale_price,
                     'stock' => round($p->opening_stock + (float) $p->purchased - (float) $p->sold + (float) $p->adjusted, 4),
@@ -176,7 +248,32 @@ class InventoryController extends Controller
     {
         $data = $request->validate($this->rules());
 
-        $product = Product::create($this->columns($data));
+        $image = null;
+        if ($request->filled('image')) {
+            $image = $this->readImage($request->input('image'));
+            if (!$image) {
+                return $this->badImage();
+            }
+        }
+
+        // No code written? Make one like PRD-0001
+        if (empty($data['sku'])) {
+            $next = (Product::max('id') ?? 0) + 1;
+
+            do {
+                $sku = 'PRD-' . str_pad($next, 4, '0', STR_PAD_LEFT);
+                $next++;
+            } while (Product::where('sku', $sku)->exists());
+
+            $data['sku'] = $sku;
+        }
+
+        $product = Product::create(array_merge($this->columns($data), ['opening_stock' => 0]));
+        $this->stamp($product);
+
+        if ($image) {
+            $this->attachImage($product, $image);
+        }
 
         return response()->json(['id' => $product->id]);
     }
@@ -192,7 +289,27 @@ class InventoryController extends Controller
 
         $data = $request->validate($this->rules($product->id));
 
+        $image = null;
+        if ($request->filled('image')) {
+            $image = $this->readImage($request->input('image'));
+            if (!$image) {
+                return $this->badImage();
+            }
+        }
+
+        // Keep the old code if the box was emptied
+        if (empty($data['sku'])) {
+            $data['sku'] = $product->sku;
+        }
+
         $product->update($this->columns($data));
+
+        if ($request->boolean('remove_image')) {
+            $this->deleteImageFile($product->image);
+            $product->update(['image' => null]);
+        } elseif ($image) {
+            $this->attachImage($product, $image);
+        }
 
         return response()->json(['ok' => true]);
     }
@@ -203,6 +320,7 @@ class InventoryController extends Controller
             return response()->json(['message' => 'This product has sales or purchases. Make it inactive instead.'], 422);
         }
 
+        $this->deleteImageFile($product->image);
         $product->delete();
 
         return response()->json(['ok' => true]);
@@ -223,7 +341,8 @@ class InventoryController extends Controller
             return response()->json(['message' => 'Stock cannot go below zero'], 422);
         }
 
-        $product->adjustments()->create($data);
+        $adjustment = $product->adjustments()->create($data);
+        $this->stamp($adjustment);
 
         return response()->json(['ok' => true]);
     }

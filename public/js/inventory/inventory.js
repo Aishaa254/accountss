@@ -31,7 +31,10 @@
             body: body ? JSON.stringify(body) : undefined
         }).then(function (res) {
             return res.json().catch(function () { return {}; }).then(function (data) {
-                if (!res.ok) { throw new Error(data.message || 'request failed'); }
+                if (!res.ok) {
+                    var keys = Object.keys(data.errors || {});
+                    throw new Error(keys.length ? data.errors[keys[0]][0] : (data.message || 'request failed'));
+                }
                 return data;
             });
         });
@@ -69,6 +72,10 @@
     var plan = {};
     var disc = 20;
 
+    // Picture chosen in the form
+    var formImage = null;      // new picture (data url), if one was chosen
+    var removeImage = false;   // true if the old picture must be removed
+
     function find(id) {
         return products.filter(function (p) { return p.id === id; })[0];
     }
@@ -90,6 +97,14 @@
     function margin(p) { return p.sale > 0 ? Math.round(((p.sale - p.cost) / p.sale) * 100) : 0; }
     function stockValue(p) { return Math.max(p.stock, 0) * p.cost; }
     function avatarOf(p) { return 'vd-av-' + (((p.id - 1) % 5) + 1); }
+
+    // Picture if there is one, otherwise the first letter
+    function avatarHtml(p, big) {
+        var cls = 'vd-avatar' + (big ? ' vd-avatar-lg' : '') + (p.image ? ' has-img' : ' ' + avatarOf(p));
+        return '<span class="' + cls + '">' +
+            (p.image ? '<img src="' + esc(p.image) + '" alt="">' : esc(p.name.charAt(0).toUpperCase())) +
+            '</span>';
+    }
 
     function statusBadge(p) {
         if (!p.active) { return '<span class="vd-badge vd-badge-inactive">Inactive</span>'; }
@@ -270,7 +285,7 @@
 
         return '<tr data-id="' + p.id + '">' +
             '<td><div class="vd-vendor">' +
-                '<span class="vd-avatar ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                avatarHtml(p) +
                 '<div><div class="vd-name">' + esc(p.name) + (p.dead && p.active ? '<span class="iv-slow-tag">Slow</span>' : '') + '</div>' +
                 '<div class="vd-company">' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</div></div>' +
             '</div></td>' +
@@ -290,7 +305,7 @@
 
         return '<div class="iv-card" data-id="' + p.id + '">' +
             '<div class="iv-card-top">' +
-                '<span class="vd-avatar ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                avatarHtml(p) +
                 '<div class="iv-card-name"><b>' + esc(p.name) + '</b><small>' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</small></div>' +
                 dotsButton(p) +
             '</div>' +
@@ -717,7 +732,7 @@
     function panelHtml(p) {
         return '' +
             '<div class="vd-profile">' +
-                '<span class="vd-avatar vd-avatar-lg ' + avatarOf(p) + '">' + esc(p.name.charAt(0).toUpperCase()) + '</span>' +
+                avatarHtml(p, true) +
                 '<div>' +
                     '<div class="vd-profile-name">' + esc(p.name) + '</div>' +
                     '<div class="vd-company">' + (p.sku ? esc(p.sku) + ' - ' : '') + esc(p.category) + '</div>' +
@@ -735,7 +750,7 @@
             '<div class="vd-info">' +
                 '<div class="vd-info-row"><span>Cost price</span><b>' + money(p.cost) + '</b></div>' +
                 '<div class="vd-info-row"><span>Sale price</span><b>' + money(p.sale) + '</b></div>' +
-                '<div class="vd-info-row"><span>Opening stock</span><b>' + num(p.opening) + '</b></div>' +
+                (p.opening > 0 ? '<div class="vd-info-row"><span>Opening stock</span><b>' + num(p.opening) + '</b></div>' : '') +
                 '<div class="vd-info-row"><span>Reorder level</span><b>' + (p.reorder ? num(p.reorder) : 'Not set') + '</b></div>' +
                 '<div class="vd-info-row"><span>Total purchased</span><b>' + num(p.purchased) + '</b></div>' +
                 '<div class="vd-info-row"><span>Total sold</span><b>' + num(p.sold) + '</b></div>' +
@@ -784,7 +799,7 @@
     });
 
     // ---------- Add / Edit product ----------
-    var formIds = ['fiName', 'fiSku', 'fiCost', 'fiSale', 'fiOpening', 'fiReorder'];
+    var formIds = ['fiName', 'fiSku', 'fiCost', 'fiSale', 'fiReorder'];
 
     function updateMarginHint() {
         var cost = parseFloat($('fiCost').value) || 0;
@@ -797,9 +812,80 @@
     $('fiCost').addEventListener('input', updateMarginHint);
     $('fiSale').addEventListener('input', updateMarginHint);
 
+    // Picture preview in the form
+    function showPicture(src) {
+        var img = $('fiPreview');
+
+        if (src) {
+            img.src = src;
+            $('fiPicBox').classList.add('has');
+        } else {
+            img.removeAttribute('src');
+            $('fiPicBox').classList.remove('has');
+        }
+    }
+
+    $('fiPicBox').addEventListener('click', function () { $('fiFile').click(); });
+    $('fiPicChoose').addEventListener('click', function () { $('fiFile').click(); });
+
+    $('fiPicRemove').addEventListener('click', function () {
+        formImage = null;
+        removeImage = true;
+        setErr('fiFile', '');
+        showPicture('');
+    });
+
+    // The picture is made smaller (320px) before it is sent, so it saves quickly
+    $('fiFile').addEventListener('change', function () {
+        var input = this;
+        var f = input.files[0];
+        setErr('fiFile', '');
+        if (!f) { return; }
+
+        if (!/^image\/(png|jpeg|webp)$/.test(f.type)) {
+            setErr('fiFile', 'Use a PNG, JPG or WebP image');
+            input.value = '';
+            return;
+        }
+        if (f.size > 10 * 1024 * 1024) {
+            setErr('fiFile', 'Image is too big (maximum 10 MB)');
+            input.value = '';
+            return;
+        }
+
+        var reader = new FileReader();
+        reader.onload = function () {
+            var img = new Image();
+            img.onload = function () {
+                var scale = Math.min(1, 320 / Math.max(img.width, img.height));
+                var canvas = document.createElement('canvas');
+                canvas.width = Math.round(img.width * scale);
+                canvas.height = Math.round(img.height * scale);
+                canvas.getContext('2d').drawImage(img, 0, 0, canvas.width, canvas.height);
+
+                formImage = canvas.toDataURL('image/png');
+                removeImage = false;
+                showPicture(formImage);
+            };
+            img.onerror = function () { setErr('fiFile', 'This image could not be read'); };
+            img.src = reader.result;
+        };
+        reader.readAsDataURL(f);
+        input.value = '';
+    });
+
+    // More details (opens and closes)
+    $('ivMoreToggle').addEventListener('click', function () {
+        var box = $('ivMore');
+        var open = box.style.display === 'none';
+        box.style.display = open ? '' : 'none';
+        this.classList.toggle('open', open);
+    });
+
     function openForm(p) {
         editingId = p ? p.id : null;
         clearErrs(formIds);
+        setErr('fiFile', '');
 
         $('ivFormTitle').textContent = p ? 'Edit Product' : 'Add Product';
         $('ivFormSave').textContent = p ? 'Save Changes' : 'Save Product';
@@ -810,10 +896,16 @@
         $('fiUnit').value = p ? p.unit : 'pcs';
         $('fiCost').value = p ? p.cost : '';
         $('fiSale').value = p ? p.sale : '';
-        $('fiOpening').value = p ? p.opening : '';
         $('fiReorder').value = p ? p.reorder : '';
         $('fiStatus').value = p ? (p.active ? 'active' : 'inactive') : 'active';
         $('fiNotes').value = p ? p.notes : '';
+
+        formImage = null;
+        removeImage = false;
+        showPicture(p && p.image ? p.image : '');
+
+        $('ivMore').style.display = 'none';
+        $('ivMoreToggle').classList.remove('open');
 
         updateMarginHint();
         openModal('ivFormModal');
@@ -846,9 +938,15 @@
 
         var cost = readNumber('fiCost', 'cost price', false);
         var sale = readNumber('fiSale', 'sale price', true);
-        var opening = readNumber('fiOpening', 'opening stock', false);
         var reorder = readNumber('fiReorder', 'reorder level', false);
-        if (cost === null || sale === null || opening === null || reorder === null) { ok = false; }
+        if (cost === null || sale === null || reorder === null) {
+            ok = false;
+            // The error may be inside the hidden "More details" part, so open it
+            if (cost === null || reorder === null) {
+                $('ivMore').style.display = '';
+                $('ivMoreToggle').classList.add('open');
+            }
+        }
 
         if (!ok) { return; }
 
@@ -859,15 +957,19 @@
             unit: $('fiUnit').value.trim() || 'pcs',
             cost: cost,
             sale: sale,
-            opening: opening,
             reorder: reorder,
             active: $('fiStatus').value === 'active',
             notes: $('fiNotes').value.trim()
         };
 
+        if (formImage) { data.image = formImage; }
+        else if (removeImage) { data.remove_image = true; }
+
         var request = editingId
             ? api('PUT', '/inventory/' + editingId, data)
             : api('POST', '/inventory', data);
+
+        $('ivFormSave').disabled = true;
 
         request
             .then(function () {
@@ -875,7 +977,8 @@
                 closeModal('ivFormModal');
                 loadProducts();
             })
-            .catch(function (err) { toast(err.message || 'Could not save product', 'err'); });
+            .catch(function (err) { toast(err.message || 'Could not save product', 'err'); })
+            .then(function () { $('ivFormSave').disabled = false; });
     }
 
     $('ivNew').addEventListener('click', function () { openForm(null); });

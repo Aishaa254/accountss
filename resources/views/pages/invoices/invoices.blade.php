@@ -5,10 +5,12 @@
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/customers/customers.css') }}">
     <link rel="stylesheet" href="{{ asset('css/invoices/invoices.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="{{ asset('js/shared/product-picker.js') }}"></script>
     <script src="{{ asset('js/invoices/invoices.js') }}"></script>
 @endpush
 
@@ -99,9 +101,8 @@
                     </div>
 
                     <span class="sec-label">Items <span class="req">*</span></span>
-                    <div class="item-head"><span>Item</span><span>Qty</span><span>Price</span><span></span></div>
+                    <div class="item-head"><span>Product</span><span>Qty</span><span>Price</span><span></span></div>
                     <div id="items"></div>
-                    <datalist id="inv-products"></datalist>
                     <small class="field-err" data-err="items"></small>
                     <button type="button" class="add-item" id="add-item">+ Add item</button>
 

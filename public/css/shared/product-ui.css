@@ -1,0 +1,135 @@
+/* =====================================================
+   Product picker (Invoices + Purchases) and product form
+   ===================================================== */
+
+/* ---------- Picker box inside a row ---------- */
+.pp {
+    display: flex; align-items: center; gap: 10px;
+    width: 100%; min-width: 0; min-height: 42px; box-sizing: border-box;
+    padding: 6px 10px;
+    border: 1px solid var(--border, #e2e8f0); border-radius: 10px;
+    background: var(--bg, #f8fafc); color: var(--text, #0f172a);
+    cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.pp:hover, .pp:focus, .pp.open { border-color: var(--main, #0f766e); outline: none; }
+.pp.open { box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18); }
+
+.pp-av {
+    width: 30px; height: 30px; flex: 0 0 30px; border-radius: 8px; overflow: hidden;
+    display: flex; align-items: center; justify-content: center;
+    background: var(--main-soft, rgba(20, 184, 166, 0.14)); color: var(--main, #0f766e);
+    font-weight: 700; font-size: 13px;
+}
+.pp-av img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.pp-av-empty { background: rgba(148, 163, 184, 0.18); color: var(--muted, #94a3b8); }
+
+.pp-text { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.2; }
+.pp-text b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-text small { font-size: 11px; color: var(--muted, #94a3b8); }
+.pp-placeholder { color: var(--muted, #94a3b8); font-size: 14px; }
+.pp-chev { color: var(--muted, #94a3b8); font-size: 12px; transition: transform .2s ease; }
+.pp.open .pp-chev { transform: rotate(180deg); }
+
+/* ---------- The dropdown ---------- */
+.pp-panel {
+    position: fixed; z-index: 3000;
+    background: var(--card, #fff); color: var(--text, #0f172a);
+    border: 1px solid var(--border, #e2e8f0); border-radius: 14px;
+    box-shadow: 0 18px 44px rgba(0, 0, 0, 0.22);
+    overflow: hidden;
+    opacity: 0; visibility: hidden; pointer-events: none;
+    transform: translateY(-8px) scale(0.98); transform-origin: top center;
+    transition: opacity .16s ease, transform .16s ease, visibility .16s;
+}
+.pp-panel.up { transform-origin: bottom center; transform: translateY(8px) scale(0.98); }
+.pp-panel.open { opacity: 1; visibility: visible; pointer-events: auto; transform: none; }
+
+.pp-search {
+    display: flex; align-items: center; gap: 10px; padding: 11px 14px;
+    border-bottom: 1px solid var(--border, #e2e8f0); color: var(--muted, #94a3b8);
+}
+.pp-search input {
+    flex: 1; border: none; outline: none; background: transparent; color: var(--text, #0f172a);
+    font-size: 14px; font-family: inherit;
+}
+
+.pp-list { max-height: 270px; overflow-y: auto; padding: 6px; }
+.pp-empty { display: none; padding: 22px; text-align: center; color: var(--muted, #94a3b8); font-size: 13px; }
+
+.pp-item {
+    display: flex; align-items: center; gap: 12px; padding: 8px 10px; border-radius: 10px; cursor: pointer;
+    transition: background .12s ease;
+}
+.pp-item.hi { background: var(--hover, rgba(148, 163, 184, 0.16)); }
+.pp-item.sel { background: var(--main-soft, rgba(20, 184, 166, 0.14)); }
+.pp-item.disabled { opacity: .45; cursor: not-allowed; }
+.pp-item .pp-av { width: 36px; height: 36px; flex-basis: 36px; border-radius: 10px; }
+
+.pp-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.25; }
+.pp-info b { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pp-info small { font-size: 12px; color: var(--muted, #94a3b8); }
+.pp-info small.bad { color: #ef4444; font-weight: 600; }
+
+.pp-price { text-align: right; font-weight: 700; font-size: 13px; white-space: nowrap; }
+.pp-price small { display: block; font-size: 10px; font-weight: 500; color: var(--muted, #94a3b8); }
+
+@keyframes pp-in { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.pp-panel.fresh .pp-item { animation: pp-in .2s ease both; }
+.pp-panel.fresh .pp-item:nth-child(2) { animation-delay: .03s; }
+.pp-panel.fresh .pp-item:nth-child(3) { animation-delay: .06s; }
+.pp-panel.fresh .pp-item:nth-child(4) { animation-delay: .09s; }
+.pp-panel.fresh .pp-item:nth-child(5) { animation-delay: .12s; }
+.pp-panel.fresh .pp-item:nth-child(6) { animation-delay: .15s; }
+
+/* ---------- Invoice item rows ---------- */
+.item-row .it-pick { min-width: 0; }
+.item-row .it-desc { grid-column: 1 / -1; }
+
+/* ---------- Purchase item rows: product, qty, buy price, sale price, total ---------- */
+.pu-item-head, .pu-item-row {
+    grid-template-columns: minmax(0, 1.7fr) 72px 98px 98px 92px 34px;
+}
+.pu-item-row .pu-pick { min-width: 0; }
+.pu-item-row .pu-desc { grid-column: 1 / -1; }
+
+@media (max-width: 600px) {
+    .pu-item-row { grid-template-columns: 1fr 1fr; }
+    .pu-item-row .pu-pick { grid-column: 1 / -1; }
+    .pu-item-row .pu-line-total { text-align: left; }
+}
+
+/* ---------- Product picture in cards / rows / panel ---------- */
+.vd-avatar.has-img { background: transparent; padding: 0; overflow: hidden; }
+.vd-avatar.has-img img { width: 100%; height: 100%; object-fit: cover; display: block; border-radius: inherit; }
+
+/* ---------- Add / Edit product form ---------- */
+.iv-form-top { display: grid; grid-template-columns: 150px 1fr; gap: 20px; align-items: start; }
+.iv-pic { text-align: center; }
+.iv-pic-box {
+    width: 150px; height: 150px; border-radius: 18px; overflow: hidden; cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    border: 2px dashed var(--border, #cbd5e1); background: var(--bg, #f8fafc);
+    color: var(--muted, #94a3b8); font-size: 34px;
+    transition: border-color .15s ease, transform .15s ease;
+}
+.iv-pic-box:hover { border-color: var(--main, #0f766e); transform: translateY(-2px); }
+.iv-pic-box img { width: 100%; height: 100%; object-fit: cover; display: none; }
+.iv-pic-box.has { border-style: solid; }
+.iv-pic-box.has img { display: block; }
+.iv-pic-box.has .iv-pic-empty { display: none; }
+.iv-pic-actions { display: flex; gap: 8px; justify-content: center; margin-top: 10px; flex-wrap: wrap; }
+
+.iv-more-toggle {
+    display: flex; align-items: center; gap: 8px; margin: 18px 0 0; padding: 8px 0;
+    background: none; border: none; color: var(--main, #0f766e); font-weight: 600; font-size: 14px;
+    font-family: inherit; cursor: pointer;
+}
+.iv-more-toggle i { transition: transform .2s ease; }
+.iv-more-toggle.open i { transform: rotate(180deg); }
+.iv-more { margin-top: 8px; animation: pp-in .2s ease both; }
+
+@media (max-width: 640px) {
+    .iv-form-top { grid-template-columns: 1fr; }
+    .iv-pic-box { margin: 0 auto; }
+}

@@ -5,9 +5,11 @@
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/vendors/vendors.css') }}">
 <link rel="stylesheet" href="{{ asset('css/purchases/purchases.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
+<script src="{{ asset('js/shared/product-picker.js') }}"></script>
 <script src="{{ asset('js/purchases/purchases.js') }}"></script>
 @endpush
 
@@ -152,10 +154,9 @@
             <h4 class="vd-sec">Items</h4>
             <div class="pu-items" id="pfItems">
                 <div class="pu-item-head">
-                    <span>Description</span><span>Qty</span><span>Unit price</span><span>Total</span><span></span>
+                    <span>Product</span><span>Qty</span><span>Buy price</span><span>Sale price</span><span>Total</span><span></span>
                 </div>
                 <div id="pfItemRows"></div>
-                <datalist id="pfProducts"></datalist>
             </div>
             <small class="vd-err" data-err="pfItems"></small>
             <button type="button" class="vd-btn-ghost pu-add-item" id="pfAddItem"><i class="fa-solid fa-plus"></i> Add item</button>

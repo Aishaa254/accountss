@@ -65,13 +65,10 @@
         });
     }
 
-    // Product suggestions (item likhte waqt list mein aate hain)
+    // Products for the item selector
     function loadProducts() {
         return api('GET', '/inventory/options').then(function (data) {
             productsData = data;
-            $('pfProducts').innerHTML = data.map(function (p) {
-                return '<option value="' + esc(p.name) + '">';
-            }).join('');
         });
     }
 
@@ -315,7 +312,7 @@
         var note = dueNote(c);
 
         var itemRows = p.items.map(function (i) {
-            return '<tr><td>' + esc(i.desc) + '</td><td class="r">' + i.qty + '</td>' +
+            return '<tr><td>' + esc(i.name) + (i.desc ? '<div class="pu-sub">' + esc(i.desc) + '</div>' : '') + '</td><td class="r">' + i.qty + '</td>' +
                 '<td class="r">' + money(i.price) + '</td><td class="r">' + money(i.qty * i.price) + '</td></tr>';
         }).join('');
 
@@ -406,18 +403,33 @@
         var row = document.createElement('div');
         row.className = 'pu-item-row';
         row.innerHTML =
-            '<input type="text" class="vd-input pu-desc" list="pfProducts" placeholder="Item description" maxlength="80">' +
+            '<div class="pu-pick"></div>' +
             '<input type="number" class="vd-input pu-qty" min="0" step="any" placeholder="Qty">' +
-            '<input type="number" class="vd-input pu-price" min="0" step="any" placeholder="Price">' +
+            '<input type="number" class="vd-input pu-price" min="0" step="any" placeholder="Buy price">' +
+            '<input type="number" class="vd-input pu-sale" min="0" step="any" placeholder="Sale price">' +
             '<div class="pu-line-total">' + money(0) + '</div>' +
-            '<button type="button" class="pu-rm" title="Remove"><i class="fa-regular fa-trash-can"></i></button>';
+            '<button type="button" class="pu-rm" title="Remove"><i class="fa-regular fa-trash-can"></i></button>' +
+            '<input type="text" class="vd-input pu-desc" placeholder="Description (optional)" maxlength="200">';
+
+        row._picker = ProductPicker.create({
+            mode: 'purchase',
+            products: function () { return productsData; },
+            onSelect: function (p) {
+                row.querySelector('.pu-price').value = p.cost > 0 ? p.cost : '';
+                row.querySelector('.pu-sale').value = p.sale > 0 ? p.sale : '';
+                if (!row.querySelector('.pu-qty').value) { row.querySelector('.pu-qty').value = 1; }
+                setErr('pfItems', '');
+                recalcForm();
+            }
+        });
+        row.querySelector('.pu-pick').appendChild(row._picker.el);
 
         if (it) {
-            row.querySelector('.pu-desc').value = it.desc;
+            if (it.product_id) { row._picker.set(it.product_id, it.name); }
+            row.querySelector('.pu-desc').value = it.desc || '';
             row.querySelector('.pu-qty').value = it.qty;
             row.querySelector('.pu-price').value = it.price;
-            if (it.product_id) { row.setAttribute('data-product', it.product_id); }
-            row.setAttribute('data-manual', '1');
+            row.querySelector('.pu-sale').value = (it.sale_price !== null && it.sale_price !== undefined) ? it.sale_price : '';
         }
         $('pfItemRows').appendChild(row);
     }
@@ -426,10 +438,11 @@
         return Array.prototype.map.call(document.querySelectorAll('#pfItemRows .pu-item-row'), function (row) {
             return {
                 row: row,
+                productId: row._picker.get(),
                 desc: row.querySelector('.pu-desc').value.trim(),
                 qtyRaw: row.querySelector('.pu-qty').value.trim(),
                 priceRaw: row.querySelector('.pu-price').value.trim(),
-                productId: row.getAttribute('data-product')
+                saleRaw: row.querySelector('.pu-sale').value.trim()
             };
         });
     }
@@ -462,40 +475,13 @@
         $('pfNotes').value = p ? p.notes : '';
 
         $('pfItemRows').innerHTML = '';
-        if (p) { p.items.forEach(addItemRow); } else { addItemRow(); }
+        if (p) { p.items.forEach(function (d) { addItemRow({ product_id: d.product_id, name: d.desc, desc: '', qty: d.qty, price: d.price }); }); } else { addItemRow(); }
 
         recalcForm();
         openModal('puFormModal');
     }
 
     $('pfItemRows').addEventListener('input', recalcForm);
-
-    // Item ka naam kisi product se match kare to product yaad rakho aur cost price bhar do
-    $('pfItemRows').addEventListener('input', function (e) {
-        if (!e.target.classList.contains('pu-desc')) { return; }
-
-        var row = e.target.closest('.pu-item-row');
-        var name = e.target.value.trim().toLowerCase();
-        var match = productsData.filter(function (p) { return p.name.toLowerCase() === name; })[0];
-
-        if (match) {
-            row.setAttribute('data-product', match.id);
-            // Price tab tak khud badalti rahegi jab tak tum usay haath se na likho
-            if (!row.hasAttribute('data-manual')) {
-                row.querySelector('.pu-price').value = match.cost;
-            }
-            recalcForm();
-        } else {
-            row.removeAttribute('data-product');
-        }
-    });
-
-    // Tum price khud likho to code usay dobara nahi badlega
-    $('pfItemRows').addEventListener('input', function (e) {
-        if (e.target.classList.contains('pu-price')) {
-            e.target.closest('.pu-item-row').setAttribute('data-manual', '1');
-        }
-    });
 
     $('pfItemRows').addEventListener('click', function (e) {
         var rm = e.target.closest('.pu-rm');
@@ -505,11 +491,11 @@
         if (document.querySelectorAll('#pfItemRows .pu-item-row').length > 1) {
             row.remove();
         } else {
+            row._picker.clear();
             row.querySelector('.pu-desc').value = '';
             row.querySelector('.pu-qty').value = '';
             row.querySelector('.pu-price').value = '';
-            row.removeAttribute('data-product');
-            row.removeAttribute('data-manual');
+            row.querySelector('.pu-sale').value = '';
         }
         recalcForm();
     });
@@ -545,25 +531,22 @@
             ok = false;
         }
 
-        // Items: bilkul khali rows ignore, baqi check
+        // Items: completely empty rows are ignored, the rest are checked
         var items = [];
         var itemError = '';
         readRows().forEach(function (r) {
-            if (!r.desc && r.qtyRaw === '' && r.priceRaw === '') { return; }
+            if (!r.productId && !r.desc && r.qtyRaw === '' && r.priceRaw === '' && r.saleRaw === '') { return; }
 
             var qty = parseFloat(r.qtyRaw);
             var price = parseFloat(r.priceRaw);
+            var sale = r.saleRaw === '' ? null : parseFloat(r.saleRaw);
 
-            if (!r.desc) { itemError = 'Every item needs a description'; }
-            else if (isNaN(qty) || qty <= 0) { itemError = 'Quantity must be more than 0 for "' + r.desc + '"'; }
-            else if (isNaN(price) || price < 0) { itemError = 'Enter a valid price for "' + r.desc + '"'; }
+            if (!r.productId) { r.row._picker.el.classList.add('is-invalid'); itemError = 'Choose a product for every item'; }
+            else if (isNaN(qty) || qty <= 0) { itemError = 'Quantity must be more than 0'; }
+            else if (isNaN(price) || price < 0) { itemError = 'Enter a valid buy price'; }
+            else if (sale !== null && (isNaN(sale) || sale < 0)) { itemError = 'Enter a valid sale price'; }
             else {
-                items.push({
-                    product_id: r.productId ? Number(r.productId) : null,
-                    desc: r.desc,
-                    qty: qty,
-                    price: price
-                });
+                items.push({ product_id: Number(r.productId), desc: r.desc, qty: qty, price: price, sale_price: sale });
             }
         });
 
@@ -757,7 +740,7 @@
 
         openForm(null);
         $('pfItemRows').innerHTML = '';
-        items.forEach(addItemRow);
+        items.forEach(function (d) { addItemRow({ product_id: d.product_id, name: d.desc, desc: '', qty: d.qty, price: d.price }); });
         recalcForm();
 
         window.history.replaceState(null, '', '/purchases');
