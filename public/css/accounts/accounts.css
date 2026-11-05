@@ -1,0 +1,108 @@
+/* ---------- Cash aur Bank pages ---------- */
+@keyframes acUp { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+
+.ac-in  { color: #16a34a; font-weight: 600; }
+.ac-out { color: #ef4444; font-weight: 600; }
+
+/* Bara balance card (Cash page) */
+.ac-hero {
+    position: relative; overflow: hidden;
+    display: flex; justify-content: space-between; align-items: stretch; gap: 24px;
+    padding: 26px 28px; margin-bottom: 22px; border-radius: 18px; color: #fff;
+    background: linear-gradient(135deg, var(--main) 0%, var(--main-light) 100%);
+    box-shadow: 0 14px 32px -14px color-mix(in srgb, var(--main) 65%, transparent);
+    animation: acUp .5s ease both;
+}
+.ac-hero::after {
+    content: ''; position: absolute; right: -60px; top: -80px; width: 260px; height: 260px;
+    border-radius: 50%; background: rgba(255, 255, 255, .12); pointer-events: none;
+}
+.ac-hero-main { position: relative; z-index: 1; }
+.ac-hero-label { font-size: 12.5px; font-weight: 600; letter-spacing: .6px; text-transform: uppercase; opacity: .9; }
+.ac-balance { font-size: 44px; font-weight: 800; line-height: 1.15; margin: 6px 0 14px; font-variant-numeric: tabular-nums; }
+.ac-hero-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.ac-chip {
+    display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px;
+    background: rgba(255, 255, 255, .18); font-size: 12.5px;
+}
+.ac-hero-spark { position: relative; z-index: 1; width: 260px; align-self: flex-end; }
+.ac-hero .ac-spark-line { stroke: #fff; }
+.ac-hero .ac-spark-area { fill: rgba(255, 255, 255, .18); }
+.ac-spark-cap { font-size: 11px; opacity: .8; text-align: right; margin-top: 2px; }
+
+/* Chhota 30 din ka graph */
+.ac-spark { width: 100%; height: 56px; display: block; }
+.ac-spark-line { fill: none; stroke: var(--main); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.ac-spark-area { fill: var(--main-soft); stroke: none; }
+
+/* Bank ke cards */
+.ac-total {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap;
+    padding: 18px 22px; margin-bottom: 18px; border-radius: 16px; border: 1px solid var(--border);
+    background: var(--card); animation: acUp .4s ease both;
+}
+.ac-total small { color: var(--muted); font-size: 12.5px; }
+.ac-total-val { font-size: 28px; font-weight: 800; font-variant-numeric: tabular-nums; }
+
+.ac-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 16px; margin-bottom: 22px; }
+.ac-bank {
+    padding: 18px; border-radius: 16px; border: 1.5px solid var(--border); background: var(--card);
+    cursor: pointer; transition: transform .18s, box-shadow .18s, border-color .18s;
+    animation: acUp .45s ease both;
+}
+.ac-bank:nth-child(2) { animation-delay: .06s; }
+.ac-bank:nth-child(3) { animation-delay: .12s; }
+.ac-bank:nth-child(n+4) { animation-delay: .18s; }
+.ac-bank:hover { transform: translateY(-3px); box-shadow: 0 12px 24px -14px rgba(15, 23, 42, .35); }
+.ac-bank.selected { border-color: var(--main); box-shadow: 0 0 0 3px color-mix(in srgb, var(--main) 18%, transparent); }
+.ac-bank.inactive { opacity: .6; }
+.ac-bank-top { display: flex; align-items: center; gap: 12px; }
+.ac-bank-ic {
+    width: 40px; height: 40px; border-radius: 12px; display: grid; place-items: center;
+    background: var(--main-soft); color: var(--main); flex: none;
+}
+.ac-bank-name { flex: 1; min-width: 0; }
+.ac-bank-name b { display: block; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ac-bank-name span { font-size: 12px; color: var(--muted); }
+.ac-bank-bal { font-size: 26px; font-weight: 800; margin: 14px 0 4px; font-variant-numeric: tabular-nums; }
+.ac-bank-foot { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 12px; }
+.ac-bank-actions { display: flex; gap: 8px; }
+.ac-bank-actions button { flex: 1; padding: 8px 10px; font-size: 12.5px; }
+.ac-bank-actions button:disabled { opacity: .5; cursor: not-allowed; }
+.ac-tag-off { font-size: 11px; background: var(--hover); color: var(--muted); padding: 2px 8px; border-radius: 999px; margin-left: 6px; }
+
+/* Statement */
+.ac-detail-head { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 16px; border-bottom: 1px solid var(--border); }
+.ac-detail-head h3 { font-size: 16px; }
+.ac-detail-head p { color: var(--muted); font-size: 12.5px; margin-top: 2px; }
+.ac-tools { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+
+.ac-strip { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.ac-strip > div { background: var(--hover); border-radius: 12px; padding: 10px 14px; }
+.ac-strip small { display: block; color: var(--muted); font-size: 12px; margin-bottom: 2px; }
+.ac-strip b { font-size: 16px; font-variant-numeric: tabular-nums; }
+
+.ac-table tbody tr { cursor: default; }
+.ac-num { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ac-bal { font-weight: 700; }
+.ac-by { color: var(--muted); font-size: 12.5px; white-space: nowrap; }
+.ac-open-row td { background: var(--hover); color: var(--muted); }
+.ac-del:hover { background: rgba(239, 68, 68, .15); color: #ef4444; }
+
+.ac-avail { padding: 10px 14px; border-radius: 10px; background: var(--main-soft); font-size: 13px; }
+
+.ac-empty { grid-column: 1 / -1; text-align: center; padding: 44px 20px; border: 1.5px dashed var(--border); border-radius: 16px; color: var(--muted); }
+.ac-empty i { font-size: 34px; color: var(--main); margin-bottom: 10px; }
+.ac-empty h3 { color: var(--text); margin-bottom: 4px; }
+.ac-empty button { margin-top: 14px; }
+
+@media (max-width: 760px) {
+    .ac-hero { flex-direction: column; }
+    .ac-hero-spark { width: 100%; }
+    .ac-balance { font-size: 34px; }
+    .ac-strip { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .ac-hero, .ac-total, .ac-bank { animation: none; }
+}

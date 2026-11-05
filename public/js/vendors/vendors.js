@@ -3,6 +3,7 @@
     var vendors = [];
 
     var state = { filter: 'all', search: '', sort: 'name', page: 1, perPage: 5 };
+    var statusBox = null; // All / Active / Balance Due / Overdue wala box
     var openId = null;      // dropdown menu
     var current = null;     // detail panel
     var editingId = null;   // add/edit form
@@ -21,11 +22,12 @@
             },
             body: body ? JSON.stringify(body) : undefined
         }).then(function (res) {
-            if (!res.ok) { throw new Error('request failed'); }
-            return res.json();
+            return res.json().catch(function () { return {}; }).then(function (data) {
+                if (!res.ok) { throw new Error(data.message || 'request failed'); }
+                return data;
+            });
         });
     }
-    
     function loadVendors() {
         api('GET', '/vendors/list').then(function (data) {
             vendors = data;
@@ -133,10 +135,14 @@
         $('cardOverdue').textContent = money(overdueAmount);
         $('cardOverdueNote').textContent = overdue.length + ' vendor(s) late';
 
-        $('cntAll').textContent = total;
-        $('cntActive').textContent = vendors.filter(function (v) { return v.status === 'active'; }).length;
-        $('cntDue').textContent = withBalance.length;
-        $('cntOverdue').textContent = overdue.length;
+        if (statusBox) {
+            statusBox.setCounts({
+                all: total,
+                active: vendors.filter(function (v) { return v.status === 'active'; }).length,
+                due: withBalance.length,
+                overdue: overdue.length
+            });
+        }
     }
 
     // ---------- List: filter, search, sort ----------
@@ -489,7 +495,26 @@
 
     // ---------- Add / Edit form ----------
     var formIds = ['fName', 'fCompany', 'fCategory', 'fPhone', 'fEmail', 'fCity', 'fAddress', 'fBalance', 'fTerms', 'fStatus', 'fNotes'];
-
+    var categoryPicker = SelectPicker.create({
+        options: [
+            { value: 'Raw Material', label: 'Raw Material', icon: 'fa-solid fa-cubes' },
+            { value: 'Services', label: 'Services', icon: 'fa-solid fa-screwdriver-wrench' },
+            { value: 'Utilities', label: 'Utilities', icon: 'fa-solid fa-bolt' },
+            { value: 'Transport', label: 'Transport', icon: 'fa-solid fa-truck' },
+            { value: 'Other', label: 'Other', icon: 'fa-solid fa-ellipsis' }
+        ],
+        value: 'Raw Material'
+    });
+    $('fCategoryBox').appendChild(categoryPicker.el);
+    
+    var statusPicker = SelectPicker.create({
+        options: [
+            { value: 'active', label: 'Active', icon: 'fa-solid fa-circle-check' },
+            { value: 'inactive', label: 'Inactive', icon: 'fa-solid fa-circle-pause' }
+        ],
+        value: 'active'
+    });
+    $('fStatusBox').appendChild(statusPicker.el);
     function openForm(v) {
         editingId = v ? v.id : null;
         $('vdFormTitle').textContent = v ? 'Edit Vendor' : 'Add Vendor';
@@ -498,13 +523,13 @@
 
         $('fName').value = v ? v.name : '';
         $('fCompany').value = v ? v.company : '';
-        $('fCategory').value = v ? v.category : 'Raw Material';
+        categoryPicker.set(v ? v.category : 'Raw Material');
         $('fPhone').value = v ? v.phone : '';
         $('fEmail').value = v ? v.email : '';
         $('fCity').value = v ? v.city : '';
         $('fAddress').value = v ? v.address : '';
         $('fNotes').value = v ? v.notes : '';
-        $('fStatus').value = v ? v.status : 'active';
+        statusPicker.set(v ? v.status : 'active');
         $('fTerms').value = v ? v.terms : 30;
         $('fBalance').value = v ? v.balance : '';
         $('fBalance').disabled = !!v;
@@ -584,13 +609,13 @@
         var data = {
             name: name,
             company: company,
-            category: $('fCategory').value,
+            category: categoryPicker.get(),
             phone: phone,
             email: email,
             city: $('fCity').value.trim(),
             address: $('fAddress').value.trim(),
             notes: $('fNotes').value.trim(),
-            status: $('fStatus').value,
+            status: statusPicker.get(),
             terms: termsNum
         };
 
@@ -619,71 +644,98 @@
     $('vdFormSave').addEventListener('click', saveForm);
 
     // ---------- Record Payment ----------
-    var payIds = ['pAmount', 'pDate'];
+   
+       // ---------- Record Payment ----------
+       var payIds = ['pAmount', 'pDate', 'pAccount'];
 
-    function openPay(v) {
-        payingId = v.id;
-        clearErrs(payIds);
-
-        $('pSummary').innerHTML = '<div class="vd-pay-name">' + esc(v.name) + '</div>' +
-            '<div class="vd-pay-bal">Payable balance: <b>' + money(v.balance) + '</b></div>';
-        $('pAmount').value = '';
-        $('pDate').value = todayStr();
-        $('pMethod').value = 'Cash';
-        $('pNote').value = '';
-
-        openModal('vdPayModal');
-        setTimeout(function () { $('pAmount').focus(); }, 60);
-    }
-
-    $('pFull').addEventListener('click', function () {
-        var v = findVendor(payingId);
-        if (v) { $('pAmount').value = v.balance; }
-    });
-
-    $('vdPaySave').addEventListener('click', function () {
-        var v = findVendor(payingId);
-        if (!v) { return; }
-
-        clearErrs(payIds);
-        var ok = true;
-
-        var amount = parseFloat($('pAmount').value);
-        var date = $('pDate').value;
-
-        if (isNaN(amount) || amount <= 0) {
-            setErr('pAmount', 'Enter an amount greater than 0');
-            ok = false;
-        } else if (amount > v.balance) {
-            setErr('pAmount', 'Amount cannot be more than the balance (' + money(v.balance) + ')');
-            ok = false;
-        }
-
-        if (!date) {
-            setErr('pDate', 'Choose the payment date');
-            ok = false;
-        } else if (date > todayStr()) {
-            setErr('pDate', 'Date cannot be in the future');
-            ok = false;
-        }
-
-        if (!ok) { return; }
-
-        amount = Math.round(amount * 100) / 100;
-
-        api('POST', '/vendors/' + v.id + '/pay', {
-            amount: amount,
-            date: date,
-            method: $('pMethod').value,
-            note: $('pNote').value.trim()
-        })
-            .then(function () {
-                closeModal('vdPayModal');
-                toast('Payment of ' + money(amount) + ' recorded');
-                loadVendors();
-            })
-            .catch(function () { toast('Could not record payment'); });
-    });
+       function togglePMethod() {
+           var cash = AccountPicker.isCash($('pAccount'));
+           $('pMethodBox').style.display = cash ? 'none' : '';
+           $('pRefBox').style.display = cash ? 'none' : '';
+       }
+   
+       function openPay(v) {
+           payingId = v.id;
+           clearErrs(payIds);
+   
+           $('pSummary').innerHTML = '<div class="vd-pay-name">' + esc(v.name) + '</div>' +
+               '<div class="vd-pay-bal">Payable balance: <b>' + money(v.balance) + '</b></div>';
+           $('pAmount').value = '';
+           $('pDate').value = todayStr();
+           $('pMethod').value = 'Bank Transfer';
+           $('pRef').value = '';
+           $('pNote').value = '';
+   
+           openModal('vdPayModal');
+           setTimeout(function () { $('pAmount').focus(); }, 60);
+   
+           AccountPicker.load().then(function (list) {
+               AccountPicker.fill($('pAccount'), list);
+               togglePMethod();
+           });
+       }
+   
+       $('pAccount').addEventListener('change', togglePMethod);
+   
+       $('pFull').addEventListener('click', function () {
+           var v = findVendor(payingId);
+           if (v) { $('pAmount').value = v.balance; }
+       });
+   
+       $('vdPaySave').addEventListener('click', function () {
+           var v = findVendor(payingId);
+           if (!v) { return; }
+   
+           clearErrs(payIds);
+           var ok = true;
+   
+           var amount = parseFloat($('pAmount').value);
+           var date = $('pDate').value;
+           var accountId = $('pAccount').value;
+   
+           if (isNaN(amount) || amount <= 0) {
+               setErr('pAmount', 'Enter an amount greater than 0');
+               ok = false;
+           } else if (amount > v.balance) {
+               setErr('pAmount', 'Amount cannot be more than the balance (' + money(v.balance) + ')');
+               ok = false;
+           }
+   
+           if (!date) {
+               setErr('pDate', 'Choose the payment date');
+               ok = false;
+           } else if (date > todayStr()) {
+               setErr('pDate', 'Date cannot be in the future');
+               ok = false;
+           }
+   
+           if (!accountId) {
+               setErr('pAccount', 'Choose the account the money is paid from');
+               ok = false;
+           }
+   
+           if (!ok) { return; }
+   
+           amount = Math.round(amount * 100) / 100;
+   
+           api('POST', '/vendors/' + v.id + '/pay', {
+               amount: amount,
+               date: date,
+               account_id: Number(accountId),
+               method: AccountPicker.isCash($('pAccount')) ? 'Cash' : $('pMethod').value,
+               reference: $('pRef').value.trim(),
+               note: $('pNote').value.trim()
+           })
+               .then(function () {
+                   closeModal('vdPayModal');
+                   toast('Payment of ' + money(amount) + ' recorded');
+                   loadVendors();
+               })
+               .catch(function (e) {
+                   toast(e.message && e.message !== 'request failed' ? e.message : 'Could not record payment');
+               });
+       });
+      
 
     // ---------- WhatsApp payment update ----------
     function sendUpdate(v) {
@@ -722,6 +774,15 @@
         .catch(function () { toast('Could not delete vendor'); });
     });
 
+
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest('.vd-step-btn');
+        if (!b) { return; }
+        var input = b.parentNode.querySelector('input');
+        if (b.getAttribute('data-dir') === '1') { input.stepUp(); } else { input.stepDown(); }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+
     // ---------- Popup band karna ----------
     document.addEventListener('click', function (e) {
         var closer = e.target.closest('[data-close]');
@@ -746,30 +807,52 @@
         render();
     });
 
-    $('vendorChips').addEventListener('click', function (e) {
-        var chip = e.target.closest('.vd-chip');
-        if (!chip) { return; }
-
-        document.querySelectorAll('#vendorChips .vd-chip').forEach(function (c) {
-            c.classList.remove('active');
-        });
-        chip.classList.add('active');
-        state.filter = chip.getAttribute('data-filter');
-        state.page = 1;
-        render();
+    statusBox = FilterSelect.create({
+        mount: $('vendorStatus'),
+        allLabel: 'All status',
+        options: [
+            { value: 'all', label: 'All' },
+            { value: 'active', label: 'Active' },
+            { value: 'due', label: 'Balance Due' },
+            { value: 'overdue', label: 'Overdue' }
+        ],
+        onChange: function (v) {
+            state.filter = v;
+            state.page = 1;
+            render();
+            DateFilter.animateRows($('vendorRows'));
+        }
     });
 
-    $('vendorSort').addEventListener('change', function () {
-        state.sort = this.value;
-        state.page = 1;
-        render();
+    var sortPicker = SelectPicker.create({
+        options: [
+            { value: 'name', label: 'Sort: Name', icon: 'fa-solid fa-arrow-down-a-z' },
+            { value: 'balance', label: 'Sort: Highest balance', icon: 'fa-solid fa-arrow-down-wide-short' },
+            { value: 'new', label: 'Sort: Newest first', icon: 'fa-regular fa-clock' }
+        ],
+        value: 'name',
+        onChange: function (v) {
+            state.sort = v;
+            state.page = 1;
+            render();
+        }
     });
+    $('vendorSortBox').appendChild(sortPicker.el);
 
-    $('vdPerPage').addEventListener('change', function () {
-        state.perPage = Number(this.value);
-        state.page = 1;
-        render();
+    var perPagePicker = SelectPicker.create({
+        options: [
+            { value: 5, label: '5', icon: 'fa-solid fa-list' },
+            { value: 10, label: '10', icon: 'fa-solid fa-list' },
+            { value: 20, label: '20', icon: 'fa-solid fa-list' }
+        ],
+        value: 5,
+        onChange: function (v) {
+            state.perPage = Number(v);
+            state.page = 1;
+            render();
+        }
     });
+    $('vdPerPageBox').appendChild(perPagePicker.el);
 
     $('vdPager').addEventListener('click', function (e) {
         var btn = e.target.closest('.vd-page');

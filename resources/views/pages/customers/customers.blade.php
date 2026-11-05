@@ -4,9 +4,14 @@
 
 @push('styles')
     <link rel="stylesheet" href="{{ asset('css/customers/customers.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/shared/date-filter.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
+    <script src="{{ asset('js/shared/date-filter.js') }}"></script>
+    <script src="{{ asset('js/accounts/account-picker.js') }}"></script>
+    <script src="{{ asset('js/shared/select-picker.js') }}"></script>
     <script src="{{ asset('js/customers/customers.js') }}"></script>
 @endpush
 
@@ -41,17 +46,13 @@
     </div>
 
     <div class="cust-box">
-        <div class="cust-toolbar">
+        <div class="cust-toolbar fb-toolbar">
             <div class="cust-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="search-box" placeholder="Search by name, phone or city...">
             </div>
-            <div class="cust-filters">
-                <button class="filter-btn active" data-filter="all">All</button>
-                <button class="filter-btn" data-filter="receivable">Receivable</button>
-                <button class="filter-btn" data-filter="payable">Payable</button>
-                <button class="filter-btn" data-filter="inactive">Inactive</button>
-            </div>
+            <!-- Status ab ek box hai (All, Receivable, Payable, Inactive) -->
+            <div id="cust-status"></div>
         </div>
 
         <div class="table-wrap">
@@ -102,10 +103,7 @@
             <div><label>Opening Balance (<span class="cur-sym">Rs</span>)</label><input type="number" id="f-opening" placeholder="0"></div>
             <div>
                 <label>Opening Balance Type</label>
-                <select id="f-type">
-                    <option value="receivable">Receivable (customer owes us)</option>
-                    <option value="payable">Payable (we owe customer)</option>
-                </select>
+                <div id="f-type-box"></div>
             </div>
             <div class="full"><label>Address</label><input type="text" id="f-address" placeholder="Full address"></div>
             <div class="full"><label>Notes</label><input type="text" id="f-notes" placeholder="e.g. Pays on the 15th"></div>

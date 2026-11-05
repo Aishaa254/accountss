@@ -6,6 +6,10 @@ var openId = null;
 var menuId = null;
 var receiveId = null;
 var avatarColors = ['#0f766e', '#6d28d9', '#c2410c', '#be123c', '#1d4ed8', '#0e7490'];
+var statusBox = null;   // All / Receivable / Payable / Inactive wala box
+var stFilter = null;    // Statement ki From - To date range
+var stCustomer = null;  // jis customer ka statement khula hai
+var stCompany = {};     // company ki maloomat (statement ke upar)
 
 // ---------- Small helper functions ----------
 function $(id) { return document.getElementById(id); }
@@ -120,6 +124,20 @@ function renderCards() {
     $('sum-over').textContent = over;
 }
 
+// Status box mein har option ke saath uski ginti
+function renderStatusCounts() {
+    if (!statusBox) return;
+
+    var active = customers.filter(function (c) { return c.active; });
+
+    statusBox.setCounts({
+        all: active.length,
+        receivable: active.filter(function (c) { return balanceOf(c) > 0; }).length,
+        payable: active.filter(function (c) { return balanceOf(c) < 0; }).length,
+        inactive: customers.length - active.length
+    });
+}
+
 // ---------- Table ----------
 function visibleCustomers() {
     var q = $('search-box').value.trim().toLowerCase();
@@ -163,6 +181,7 @@ function renderTable() {
 
 function renderAll() {
     renderCards();
+    renderStatusCounts();
     renderTable();
     if (openId) openPanel(openId, true);
 }
@@ -356,7 +375,7 @@ function openModal(id) {
     $('f-address').value = c ? c.address : '';
     $('f-limit').value = c ? c.limit : '';
     $('f-opening').value = c ? Math.abs(c.opening) : '';
-    $('f-type').value = c && c.opening < 0 ? 'payable' : 'receivable';
+    typePicker.set(c && c.opening < 0 ? 'payable' : 'receivable');
     $('f-notes').value = c ? c.notes : '';
 
     $('modal').classList.add('show');
@@ -373,7 +392,7 @@ function saveCustomer() {
     }
 
     var amount = Math.abs(parseFloat($('f-opening').value) || 0);
-    var opening = $('f-type').value === 'payable' ? -amount : amount;
+    var opening = typePicker.get() === 'payable' ? -amount : amount;
 
     var data = {
         name: name, phone: phone,
@@ -417,9 +436,10 @@ function runAction(kind, c) {
 
     if (kind === 'invoice') { window.location.href = '/invoices?customer=' + c.id; }
     else if (kind === 'payment') { openReceive(c); }
-    else if (kind === 'statement') { printStatement(c); }
+    else if (kind === 'statement') { showStatement(c); }
 }
 
+// ---------- Receive Payment popup (built here, no blade change needed) ----------
 // ---------- Receive Payment popup (built here, no blade change needed) ----------
 var recvModal = document.createElement('div');
 recvModal.className = 'modal-back';
@@ -431,6 +451,8 @@ recvModal.innerHTML =
         '<div class="form-grid" style="grid-template-columns:1fr;">' +
             '<div><label>Amount received</label><input type="number" id="recv-amount" min="0" step="any"></div>' +
             '<div><label>Date</label><input type="date" id="recv-date"></div>' +
+            '<div><label>Received in</label><select id="recv-account"></select></div>' +
+            '<div id="recv-ref-box"><label>Reference no. (optional)</label><input type="text" id="recv-ref" maxlength="60"></div>' +
         '</div>' +
         '<p class="form-error" id="recv-error"></p>' +
         '<div class="modal-foot">' +
@@ -442,6 +464,9 @@ document.body.appendChild(recvModal);
 
 function closeReceive() { recvModal.classList.remove('show'); }
 
+function toggleRecvMethod() {
+    $('recv-ref-box').style.display = AccountPicker.isCash($('recv-account')) ? 'none' : '';
+}
 function openReceive(c) {
     var due = unpaidTotal(c);
 
@@ -454,10 +479,16 @@ function openReceive(c) {
     $('recv-info').innerHTML = esc(c.name) + '<br>Unpaid invoices total: <b>' + money(due) + '</b>. The oldest invoice is paid first.';
     $('recv-amount').value = due;
     $('recv-date').value = localToday();
+    $('recv-ref').value = '';
     $('recv-error').textContent = '';
 
     recvModal.classList.add('show');
     $('recv-amount').focus();
+
+    AccountPicker.load().then(function (list) {
+        AccountPicker.fill($('recv-account'), list);
+        toggleRecvMethod();
+    });
 }
 
 function saveReceive() {
@@ -467,15 +498,23 @@ function saveReceive() {
     var due = unpaidTotal(c);
     var amount = parseFloat($('recv-amount').value);
     var date = $('recv-date').value;
+    var accountId = $('recv-account').value;
 
     if (isNaN(amount) || amount <= 0) { $('recv-error').textContent = 'Enter an amount more than 0.'; return; }
     if (amount > due + 0.005) { $('recv-error').textContent = 'Amount cannot be more than the unpaid total (' + money(due) + ').'; return; }
     if (!date) { $('recv-error').textContent = 'Choose the date.'; return; }
     if (date > localToday()) { $('recv-error').textContent = 'Date cannot be in the future.'; return; }
+    if (!accountId) { $('recv-error').textContent = 'Choose where the money was received.'; return; }
+
 
     $('recv-save').disabled = true;
 
-    sendJson('POST', '/customers/' + c.id + '/receive', { amount: round2(amount), date: date })
+    sendJson('POST', '/customers/' + c.id + '/receive', {
+        amount: round2(amount),
+        date: date,
+        account_id: Number(accountId),
+        reference: $('recv-ref').value.trim()
+    })
         .then(function () {
             closeReceive();
             toast('Payment of ' + money(amount) + ' received');
@@ -490,78 +529,190 @@ function saveReceive() {
 $('recv-save').addEventListener('click', saveReceive);
 $('recv-close').addEventListener('click', closeReceive);
 $('recv-cancel').addEventListener('click', closeReceive);
+$('recv-account').addEventListener('change', toggleRecvMethod);
 recvModal.addEventListener('click', function (e) { if (e.target === recvModal) closeReceive(); });
+        
 
-// ---------- Statement (opens a clean page and prints) ----------
-function printStatement(c) {
-    var win = window.open('', '_blank');
-    if (!win) { toast('Allow pop-ups to see the statement'); return; }
+// ---------- Statement: first it is shown like an invoice, printing is a separate button ----------
+var STATEMENT_CSS =
+    '.st-doc{background:#fff;color:#0f172a;padding:28px;font-family:"Segoe UI",Arial,sans-serif;font-size:13px;line-height:1.5;border-radius:8px;}' +
+    '.st-doc .st-top{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:18px;}' +
+    '.st-doc .st-co{font-size:20px;font-weight:700;color:#0f766e;}' +
+    '.st-doc .st-small{color:#64748b;font-size:12px;line-height:1.6;}' +
+    '.st-doc .st-title{font-size:22px;font-weight:700;letter-spacing:2px;text-align:right;}' +
+    '.st-doc .st-cust{background:#f1f5f9;border-radius:8px;padding:12px 14px;margin-bottom:16px;line-height:1.6;}' +
+    '.st-doc table{width:100%;border-collapse:collapse;}' +
+    '.st-doc th{background:#0f766e;color:#fff;text-align:left;padding:8px;font-size:12px;}' +
+    '.st-doc td{padding:8px;border-bottom:1px solid #e2e8f0;}' +
+    '.st-doc .r{text-align:right;}' +
+    '.st-doc .st-close{margin-top:16px;text-align:right;font-size:15px;}' +
+    '.st-doc .st-note{margin-top:22px;color:#94a3b8;font-size:11px;text-align:center;}' +
+    '.st-scroll{max-height:62vh;overflow:auto;border:1px solid var(--border,#e2e8f0);border-radius:10px;margin-bottom:6px;}';
 
-    win.document.write('<p style="font-family:sans-serif;padding:20px;">Preparing statement...</p>');
+var stStyle = document.createElement('style');
+stStyle.textContent = STATEMENT_CSS;
+document.head.appendChild(stStyle);
 
+var stModal = document.createElement('div');
+stModal.className = 'modal-back';
+stModal.innerHTML =
+    '<div class="modal-box" style="max-width:800px;width:94%;">' +
+        '<div class="modal-top"><h3>Statement</h3>' +
+            '<button class="icon-x" id="st-close"><i class="fa-solid fa-xmark"></i></button></div>' +
+        '<div id="st-filter" style="margin-bottom:12px;"></div>' +
+        '<div class="st-scroll" id="st-body"></div>' +
+        '<div class="modal-foot">' +
+            '<button class="btn-ghost" id="st-cancel">Close</button>' +
+            '<button class="btn-main" id="st-print"><i class="fa-solid fa-print"></i> Print</button>' +
+        '</div>' +
+    '</div>';
+document.body.appendChild(stModal);
+
+var stCurrent = null; // the statement that is open: { html, title }
+
+function closeStatement() { stModal.classList.remove('show'); }
+
+// Statement ke upar sirf From - To (alag popup nahi). Date badalte hi statement dobara banta hai.
+stFilter = DateFilter.create({
+    mount: $('st-filter'),
+    noun: 'entries',
+    onChange: function () {
+        renderStatement();
+        DateFilter.animateRows($('st-body').querySelector('tbody'));
+    }
+});
+
+function inStatementRange(e, range) {
+    if (range.from && e.date < range.from) { return false; }
+    if (range.to && e.date > range.to) { return false; }
+    return true;
+}
+
+function statementRow(date, desc, debit, credit, running) {
+    return '<tr><td>' + esc(date) + '</td><td>' + esc(desc) + '</td>' +
+        '<td class="r">' + (debit ? money(debit) : '-') + '</td>' +
+        '<td class="r">' + (credit ? money(credit) : '-') + '</td>' +
+        '<td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
+}
+
+// range khali ho to poora statement, warna sirf chuni hui From - To ki entries
+function statementHtml(c, co, range) {
+    range = range || {};
+    var running = c.opening;
+    var rows = '';
+    var shown = 0, totalDebit = 0, totalCredit = 0;
+
+    if (range.from) {
+        // Range se pehle ka hisaab "Balance brought forward" ban jata hai
+        c.ledger.forEach(function (e) { if (e.date < range.from) { running += e.debit - e.credit; } });
+        rows += statementRow(range.from, 'Balance brought forward', 0, 0, running);
+    } else if (c.opening !== 0) {
+        rows += statementRow('-', 'Opening balance', 0, 0, running);
+    }
+
+    c.ledger.forEach(function (e) {
+        if (!inStatementRange(e, range)) { return; }
+        running += e.debit - e.credit;
+        totalDebit += e.debit;
+        totalCredit += e.credit;
+        shown++;
+        rows += statementRow(e.date, e.desc, e.debit, e.credit, running);
+    });
+
+    if (!shown) {
+        rows += '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px;">' +
+            (range.from || range.to ? 'No entries in this period.' : 'No entries yet.') + '</td></tr>';
+    }
+
+    var closing = running > 0 ? 'Balance due from customer: <b>' + money(running) + '</b>'
+        : (running < 0 ? 'We owe the customer: <b>' + money(running) + '</b>' : 'Account is clear: <b>' + money(0) + '</b>');
+
+    var hasRange = range.mode && range.mode !== 'all';
+
+    return '<div class="st-doc">' +
+        '<div class="st-top">' +
+            '<div><div class="st-co">' + esc(co.name || 'Your Company') + '</div>' +
+                '<div class="st-small">' + esc(co.address || '') + '<br>' + esc(co.phone || '') + '</div></div>' +
+            '<div><div class="st-title">STATEMENT</div>' +
+                '<div class="st-small" style="text-align:right;">Date: ' + localToday() + '</div>' +
+                (hasRange ? '<div class="st-small" style="text-align:right;"><b>Period: ' + esc(range.label) + '</b></div>' : '') +
+            '</div>' +
+        '</div>' +
+        '<div class="st-cust"><b>' + esc(c.name) + '</b><br>' +
+            esc(c.phone) + (c.city ? ' - ' + esc(c.city) : '') +
+            (c.address ? '<br>' + esc(c.address) : '') + '</div>' +
+        '<table><thead><tr><th>Date</th><th>Details</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead>' +
+            '<tbody>' + rows + '</tbody></table>' +
+        '<div style="margin-top:12px;text-align:right;color:#64748b;font-size:12px;">Total debit: <b>' + money(totalDebit) + '</b> &nbsp;|&nbsp; Total credit: <b>' + money(totalCredit) + '</b></div>' +
+        '<div class="st-close">' + closing + '</div>' +
+        '<div class="st-note">Debit = invoice created. Credit = payment received. Cr = we owe the customer.</div>' +
+    '</div>';
+}
+
+// Statement ko chuni hui date range ke hisaab se screen par dikhata hai
+function renderStatement() {
+    if (!stCustomer) { return; }
+
+    var r = stFilter.getRange();
+
+    stCurrent = {
+        html: statementHtml(stCustomer, stCompany, r),
+        title: 'Statement - ' + stCustomer.name + (r.mode !== 'all' ? ' (' + r.label + ')' : '')
+    };
+    $('st-body').innerHTML = stCurrent.html;
+}
+
+// Step 1: only show the statement on the screen
+function showStatement(c) {
     fetch('/company/info', { headers: { 'Accept': 'application/json' } })
         .then(function (res) { return res.json(); })
         .catch(function () { return {}; })
         .then(function (co) {
-            var running = c.opening;
-            var rows = '';
-
-            if (c.opening !== 0) {
-                rows += '<tr><td>-</td><td>Opening balance</td><td class="r">-</td><td class="r">-</td><td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
-            }
-            c.ledger.forEach(function (e) {
-                running += e.debit - e.credit;
-                rows += '<tr><td>' + esc(e.date) + '</td><td>' + esc(e.desc) + '</td>' +
-                    '<td class="r">' + (e.debit ? money(e.debit) : '-') + '</td>' +
-                    '<td class="r">' + (e.credit ? money(e.credit) : '-') + '</td>' +
-                    '<td class="r">' + money(running) + (running < 0 ? ' Cr' : '') + '</td></tr>';
-            });
-            if (!rows) { rows = '<tr><td colspan="5" style="text-align:center;color:#94a3b8;padding:18px;">No entries yet.</td></tr>'; }
-
-            var b = balanceOf(c);
-            var closing = b > 0 ? 'Balance due from customer: <b>' + money(b) + '</b>'
-                : (b < 0 ? 'We owe the customer: <b>' + money(b) + '</b>' : 'Account is clear: <b>' + money(0) + '</b>');
-
-            var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>Statement - ' + esc(c.name) + '</title>' +
-                '<style>' +
-                'body{font-family:Segoe UI,Arial,sans-serif;color:#0f172a;margin:0;padding:28px;font-size:13px;}' +
-                '.top{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0f766e;padding-bottom:14px;margin-bottom:18px;}' +
-                '.co{font-size:20px;font-weight:700;color:#0f766e;}' +
-                '.small{color:#64748b;font-size:12px;line-height:1.6;}' +
-                '.title{font-size:22px;font-weight:700;text-align:right;}' +
-                '.cust{background:#f1f5f9;border-radius:8px;padding:12px 14px;margin-bottom:16px;line-height:1.6;}' +
-                'table{width:100%;border-collapse:collapse;}' +
-                'th{background:#0f766e;color:#fff;text-align:left;padding:8px;font-size:12px;}' +
-                'td{padding:8px;border-bottom:1px solid #e2e8f0;}' +
-                '.r{text-align:right;}' +
-                '.close{margin-top:16px;text-align:right;font-size:15px;}' +
-                '.note{margin-top:26px;color:#94a3b8;font-size:11px;text-align:center;}' +
-                '@media print{body{padding:10px;}}' +
-                '</style></head><body>' +
-                '<div class="top">' +
-                    '<div><div class="co">' + esc(co.name || 'Your Company') + '</div>' +
-                        '<div class="small">' + esc(co.address || '') + '<br>' + esc(co.phone || '') + '</div></div>' +
-                    '<div><div class="title">STATEMENT</div>' +
-                        '<div class="small" style="text-align:right;">Date: ' + localToday() + '</div></div>' +
-                '</div>' +
-                '<div class="cust"><b>' + esc(c.name) + '</b><br>' +
-                    esc(c.phone) + (c.city ? ' - ' + esc(c.city) : '') +
-                    (c.address ? '<br>' + esc(c.address) : '') + '</div>' +
-                '<table><thead><tr><th>Date</th><th>Details</th><th class="r">Debit</th><th class="r">Credit</th><th class="r">Balance</th></tr></thead>' +
-                    '<tbody>' + rows + '</tbody></table>' +
-                '<div class="close">' + closing + '</div>' +
-                '<div class="note">Debit = invoice created. Credit = payment received. Cr = we owe the customer.</div>' +
-                '</body></html>';
-
-            win.document.open();
-            win.document.write(html);
-            win.document.close();
-            win.focus();
-            setTimeout(function () { win.print(); }, 400);
+            stCustomer = c;
+            stCompany = co || {};
+            stFilter.clear(true); // har baar naya statement poori date range se shuru hota hai
+            renderStatement();
+            stModal.classList.add('show');
         });
 }
 
+// Step 2: print only when the Print button is clicked
+function printStatementNow() {
+    if (!stCurrent) { return; }
+
+    var frame = document.createElement('iframe');
+    frame.style.cssText = 'position:fixed;right:0;bottom:0;width:0;height:0;border:0;';
+    document.body.appendChild(frame);
+
+    var doc = frame.contentWindow.document;
+    doc.open();
+    doc.write('<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + esc(stCurrent.title) + '</title>' +
+        '<style>body{margin:0;}' + STATEMENT_CSS + '@media print{.st-doc{padding:10px;}}</style></head><body>' +
+        stCurrent.html + '</body></html>');
+    doc.close();
+
+    setTimeout(function () {
+        frame.contentWindow.focus();
+        frame.contentWindow.print();
+        setTimeout(function () { document.body.removeChild(frame); }, 1500);
+    }, 300);
+}
+
+$('st-print').addEventListener('click', printStatementNow);
+$('st-close').addEventListener('click', closeStatement);
+$('st-cancel').addEventListener('click', closeStatement);
+stModal.addEventListener('click', function (e) { if (e.target === stModal) closeStatement(); });
+
 // ---------- Buttons and clicks ----------
+// ---------- Opening Balance Type ka dropdown ----------
+var typePicker = SelectPicker.create({
+    options: [
+        { value: 'receivable', label: 'Receivable', note: 'Customer owes us', icon: 'fa-solid fa-hand-holding-dollar' },
+        { value: 'payable', label: 'Payable', note: 'We owe customer', icon: 'fa-solid fa-wallet' }
+    ],
+    value: 'receivable'
+});
+$('f-type-box').appendChild(typePicker.el);
 $('cust-body').addEventListener('click', function (e) {
     var row = e.target.closest('tr');
     if (!row) return;
@@ -593,17 +744,25 @@ $('modal-save').addEventListener('click', saveCustomer);
 $('modal').addEventListener('click', function (e) { if (e.target === $('modal')) closeModal(); });
 $('search-box').addEventListener('input', renderTable);
 
-document.querySelectorAll('.filter-btn').forEach(function (b) {
-    b.addEventListener('click', function () {
-        document.querySelectorAll('.filter-btn').forEach(function (x) { x.classList.remove('active'); });
-        b.classList.add('active');
-        currentFilter = b.dataset.filter;
+// Status box: All / Receivable / Payable / Inactive
+statusBox = FilterSelect.create({
+    mount: $('cust-status'),
+    allLabel: 'All status',
+    options: [
+        { value: 'all', label: 'All' },
+        { value: 'receivable', label: 'Receivable' },
+        { value: 'payable', label: 'Payable' },
+        { value: 'inactive', label: 'Inactive' }
+    ],
+    onChange: function (v) {
+        currentFilter = v;
         renderTable();
-    });
+        DateFilter.animateRows($('cust-body'));
+    }
 });
 
 document.addEventListener('keydown', function (e) {
-    if (e.key === 'Escape') { closeMenu(); closeModal(); closeReceive(); closePanel(); }
+    if (e.key === 'Escape') { closeMenu(); closeModal(); closeReceive(); closeStatement(); closePanel(); }
 });
 
 function loadCustomers() {

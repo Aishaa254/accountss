@@ -6,6 +6,10 @@ use Illuminate\Http\Request;
 use App\Models\Vendor;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use App\Models\Account;
+use App\Services\AccountLedger;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class VendorController extends Controller
 {
@@ -122,18 +126,22 @@ class VendorController extends Controller
 
         return response()->json(['ok' => true]);
     }
-
     public function destroy(Vendor $vendor)
     {
         if ($vendor->purchases()->exists()) {
             return response()->json(['message' => 'Vendors with purchases cannot be deleted'], 422);
         }
 
-        $vendor->delete();
+        DB::transaction(function () use ($vendor) {
+            foreach ($vendor->payments()->pluck('id') as $id) {
+                AccountLedger::forget('vendor_payment', $id);
+            }
+
+            $vendor->delete();
+        });
 
         return response()->json(['ok' => true]);
     }
-
     public function pay(Request $request, Vendor $vendor)
     {
         $vendor->load(['payments', 'purchases.items', 'purchases.payments']);
@@ -149,21 +157,45 @@ class VendorController extends Controller
         $data = $request->validate([
             'amount' => 'required|numeric|gt:0|lte:' . $payable,
             'date' => 'required|date|before_or_equal:today',
-            'method' => 'required|string|max:50',
             'note' => 'nullable|string|max:255',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('active', true)],
+            'reference' => 'nullable|string|max:60',
+        ], [
+            'account_id.required' => 'Choose which account the money is paid from.',
+            'account_id.exists' => 'This account is not available.',
         ]);
 
-        DB::transaction(function () use ($vendor, $data, $openingLeft, $unpaid) {
+        $account = Account::findOrFail($data['account_id']);
+        $method = $account->type === 'cash' ? 'Cash' : 'Bank';
+
+        if ((float) $data['amount'] > $account->balance()) {
+            throw ValidationException::withMessages([
+                'account_id' => 'Not enough money in ' . $account->name . '. Available: ' . number_format($account->balance(), 2) . '.',
+            ]);
+        }
+
+        DB::transaction(function () use ($vendor, $data, $openingLeft, $unpaid, $account, $method) {
             $left = (float) $data['amount'];
+            $ref = $data['reference'] ?? null;
 
             $toOpening = min($left, $openingLeft);
             if ($toOpening > 0) {
-                $vendor->payments()->create([
+                $payment = $vendor->payments()->create([
                     'amount' => $toOpening,
                     'date' => $data['date'],
-                    'method' => $data['method'],
+                    'method' => $method,
                     'note' => $data['note'] ?? null,
+                    'account_id' => $account->id,
+                    'reference' => $ref,
                 ]);
+                $payment->forceFill(['created_by' => auth()->id()])->save();
+
+                AccountLedger::post(
+                    $account, 'out', (float) $toOpening, $data['date'], 'payment_out', 'vendor_payment', $payment->id,
+                    $method, $ref,
+                    'Paid ' . $vendor->name . ' (opening balance)' . (!empty($data['note']) ? ' - ' . $data['note'] : '')
+                );
+
                 $left = round($left - $toOpening, 2);
             }
 
@@ -171,14 +203,26 @@ class VendorController extends Controller
                 if ($left <= 0) { break; }
 
                 $part = min($left, $p->balance());
-                $p->payments()->create([
+
+                $payment = $p->payments()->create([
                     'amount' => $part,
                     'date' => $data['date'],
-                    'method' => $data['method'],
+                    'method' => $method,
+                    'account_id' => $account->id,
+                    'reference' => $ref,
                 ]);
+                $payment->forceFill(['created_by' => auth()->id()])->save();
+
+                AccountLedger::post(
+                    $account, 'out', (float) $part, $data['date'], 'payment_out', 'purchase_payment', $payment->id,
+                    $method, $ref,
+                    'Paid ' . $p->no . ' to ' . $vendor->name
+                );
+
                 $left = round($left - $part, 2);
             }
         });
+
 
         return response()->json(['ok' => true]);
     }

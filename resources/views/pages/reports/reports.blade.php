@@ -37,9 +37,12 @@
     <p id="rpInsight"></p>
 </div>
 
+<p class="rp-cmp-sub" id="rpNote" style="display:none;margin:-6px 0 16px"></p>
+
 <div class="rp-tabs" id="rpTabs">
     <button type="button" class="rp-tab active" data-tab="pl"><i class="fa-solid fa-scale-balanced"></i> Profit and Loss</button>
     <button type="button" class="rp-tab" data-tab="sales"><i class="fa-solid fa-chart-line"></i> Sales</button>
+    <button type="button" class="rp-tab" data-tab="prod"><i class="fa-solid fa-boxes-stacked"></i> Products</button>
     <button type="button" class="rp-tab" data-tab="exp"><i class="fa-solid fa-receipt"></i> Expenses</button>
     <button type="button" class="rp-tab" data-tab="age"><i class="fa-solid fa-hourglass-half"></i> Aging</button>
 </div>

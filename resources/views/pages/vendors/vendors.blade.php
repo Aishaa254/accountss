@@ -4,9 +4,14 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/vendors/vendors.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/date-filter.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
+<script src="{{ asset('js/shared/date-filter.js') }}"></script>
+<script src="{{ asset('js/accounts/account-picker.js') }}"></script>
+<script src="{{ asset('js/shared/select-picker.js') }}"></script>
 <script src="{{ asset('js/vendors/vendors.js') }}"></script>
 @endpush
 
@@ -64,24 +69,16 @@
 <!-- ===== List ===== -->
 <div class="vd-panel">
 
-    <div class="vd-toolbar">
+    <div class="vd-toolbar fb-toolbar">
         <div class="vd-search">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="vendorSearch" placeholder="Search by name, company or phone">
         </div>
 
-        <div class="vd-chips" id="vendorChips">
-            <button type="button" class="vd-chip active" data-filter="all">All <span id="cntAll">0</span></button>
-            <button type="button" class="vd-chip" data-filter="active">Active <span id="cntActive">0</span></button>
-            <button type="button" class="vd-chip" data-filter="due">Balance Due <span id="cntDue">0</span></button>
-            <button type="button" class="vd-chip" data-filter="overdue">Overdue <span id="cntOverdue">0</span></button>
-        </div>
+        <!-- Status ab ek box hai (All, Active, Balance Due, Overdue) -->
+        <div id="vendorStatus"></div>
 
-        <select class="vd-sort" id="vendorSort">
-            <option value="name">Sort: Name</option>
-            <option value="balance">Sort: Highest balance</option>
-            <option value="new">Sort: Newest first</option>
-        </select>
+        <div id="vendorSortBox"></div>
     </div>
 
     <div class="vd-table-wrap">
@@ -104,11 +101,7 @@
         <div class="vd-foot-info" id="vdInfo"></div>
         <div class="vd-foot-right">
             <label class="vd-perpage">Rows
-                <select id="vdPerPage">
-                    <option value="5">5</option>
-                    <option value="10">10</option>
-                    <option value="20">20</option>
-                </select>
+                <div id="vdPerPageBox"></div>
             </label>
             <div class="vd-pager" id="vdPager"></div>
         </div>
@@ -157,13 +150,7 @@
 
                 <div class="vd-field">
                     <label>Category</label>
-                    <select class="vd-input" id="fCategory">
-                        <option>Raw Material</option>
-                        <option>Services</option>
-                        <option>Utilities</option>
-                        <option>Transport</option>
-                        <option>Other</option>
-                    </select>
+                    <div id="fCategoryBox"></div>
                 </div>
 
                 <div class="vd-field">
@@ -193,16 +180,17 @@
 
                 <div class="vd-field">
                     <label>Payment Terms (days) <span class="vd-req">*</span></label>
-                    <input type="number" class="vd-input" id="fTerms" min="0" max="365" placeholder="30">
+                    <div class="vd-step">
+                        <button type="button" class="vd-step-btn" data-dir="-1"><i class="fa-solid fa-minus"></i></button>
+                        <input type="number" class="vd-input" id="fTerms" min="0" max="365" placeholder="30">
+                        <button type="button" class="vd-step-btn" data-dir="1"><i class="fa-solid fa-plus"></i></button>
+                    </div>
                     <small class="vd-err" data-err="fTerms"></small>
                 </div>
 
                 <div class="vd-field">
                     <label>Status</label>
-                    <select class="vd-input" id="fStatus">
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                    </select>
+                    <div id="fStatusBox"></div>
                 </div>
 
                 <div class="vd-field vd-full">
@@ -251,13 +239,26 @@
             </div>
 
             <div class="vd-field">
-                <label>Method</label>
-                <select class="vd-input" id="pMethod">
-                    <option>Cash</option>
-                    <option>Bank Transfer</option>
-                    <option>Cheque</option>
-                    <option>Online</option>
-                </select>
+                <label>Paid from <span class="vd-req">*</span></label>
+                <select class="vd-input" id="pAccount"></select>
+                <small class="vd-err" data-err="pAccount"></small>
+            </div>
+
+            <div style="display:none">
+                <div class="vd-field" id="pMethodBox">
+                    <label>Method</label>
+                    <select class="vd-input" id="pMethod">
+                        <option>Bank Transfer</option>
+                        <option>Cheque</option>
+                        <option>Online</option>
+                        <option>Cash</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="vd-field" id="pRefBox">
+                <label>Reference no.</label>
+                <input type="text" class="vd-input" id="pRef" maxlength="60" placeholder="Optional">
             </div>
 
             <div class="vd-field">

@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Purchase;
+use App\Support\Profit;
 use Carbon\Carbon;
 
 class ReportController extends Controller
@@ -13,7 +14,7 @@ class ReportController extends Controller
     {
         $today = now()->startOfDay();
 
-        $invoices = Invoice::with(['items', 'payments', 'customer'])->get();
+        $invoices = Invoice::with(['items.product', 'payments', 'customer'])->get();
         $purchases = Purchase::with(['items', 'payments', 'vendor'])->get();
 
         // Days late: positive means overdue, zero or negative means not due yet
@@ -21,11 +22,38 @@ class ReportController extends Controller
             return (int) Carbon::parse($due)->startOfDay()->diffInDays($today, false);
         };
 
-        return response()->json([
-            'sales' => $invoices->map(function ($i) {
-                return ['date' => $i->date, 'name' => $i->customer->name, 'amount' => $i->total()];
-            })->values(),
+        // Har invoice ka revenue (tax ke baghair) aur cost, aur har item ki line
+        $sales = [];
+        $items = [];
 
+        foreach ($invoices as $i) {
+            $lines = Profit::lines($i);
+
+            $sales[] = [
+                'date' => $i->date,
+                'name' => $i->customer->name,
+                'amount' => round(array_sum(array_column($lines, 'revenue')), 2),
+                'cost' => round(array_sum(array_column($lines, 'cost')), 2),
+            ];
+
+            foreach ($lines as $l) {
+                $items[] = [
+                    'date' => $l['date'],
+                    'product' => $l['product'],
+                    'qty' => $l['qty'],
+                    'revenue' => $l['revenue'],
+                    'cost' => $l['cost'],
+                    'estimated' => $l['estimated'],
+                    'unknown' => $l['unknown'],
+                ];
+            }
+        }
+
+        return response()->json([
+            'sales' => $sales,
+            'items' => $items,
+
+            // Purchases ab sirf maloomat ke liye hain, profit se minus nahi hoti
             'purchases' => $purchases->map(function ($p) {
                 return ['date' => $p->date, 'name' => $p->vendor->name, 'amount' => $p->total()];
             })->values(),

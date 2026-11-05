@@ -48,8 +48,16 @@
     </a>
     @endif
 
-    @if ($me->hasPermission('expenses') || $me->hasPermission('reports'))
+    @if ($me->hasPermission('expenses') || $me->hasPermission('reports') || $me->hasPermission('accounts'))
     <p class="menu-title">Accounting</p>
+    @endif
+    @if ($me->hasPermission('accounts'))
+    <a href="/cash" class="menu-link {{ request()->is('cash') ? 'active' : '' }}">
+        <i class="fa-solid fa-money-bill-wave"></i> Cash
+    </a>
+    <a href="/banks" class="menu-link {{ request()->is('banks') ? 'active' : '' }}">
+        <i class="fa-solid fa-building-columns"></i> Bank
+    </a>
     @endif
     @if ($me->hasPermission('expenses'))
     <a href="/expenses" class="menu-link {{ request()->is('expenses') ? 'active' : '' }}">
@@ -59,6 +67,9 @@
     @if ($me->hasPermission('reports'))
     <a href="/reports" class="menu-link {{ request()->is('reports') ? 'active' : '' }}">
         <i class="fa-solid fa-chart-pie"></i> Reports
+    </a>
+    <a href="/advisor" class="menu-link {{ request()->is('advisor') ? 'active' : '' }}">
+        <i class="fa-solid fa-lightbulb"></i> Business Advisor
     </a>
     @endif
 

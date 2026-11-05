@@ -9,6 +9,7 @@ return [
         'purchases' => 'Purchases and Vendors',
         'inventory' => 'Inventory',
         'expenses' => 'Expenses',
+        'accounts' => 'Cash and Bank',
         'reports' => 'Reports',
         'accounting' => 'Accounting (journal, ledger)',
         'tasks' => 'Tasks (own tasks)',
@@ -27,7 +28,7 @@ return [
         'accountant' => [
             'label' => 'Accountant',
             'about' => 'Sales, purchases, inventory, expenses, reports and accounting.',
-            'permissions' => ['dashboard', 'sales', 'purchases', 'inventory', 'expenses', 'reports', 'accounting', 'tasks'],
+            'permissions' => ['dashboard', 'sales', 'purchases', 'inventory', 'expenses','accounts', 'reports', 'accounting', 'tasks'],
         ],
         'manager' => [
             'label' => 'Manager',

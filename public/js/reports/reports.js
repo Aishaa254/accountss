@@ -18,7 +18,7 @@
     }
 
     var now = new Date();
-    var sales = [], purchases = [], expenses = [], receivables = [], payables = [];
+    var sales = [], items = [], purchases = [], expenses = [], receivables = [], payables = [];
 
     var buckets = [
         { label: 'Not due', color: '#22c55e', test: function (x) { return x.late <= 0; } },
@@ -52,12 +52,19 @@
     function inRange(list, a, b) { return list.filter(function (x) { return x.date >= a && x.date <= b; }); }
     function sum(list) { return list.reduce(function (s, x) { return s + x.amount; }, 0); }
 
+    function sumKey(list, key) { return list.reduce(function (s, x) { return s + x[key]; }, 0); }
+
+    // Asli profit: Sales (tax ke baghair) - bike hue maal ki cost - Expenses.
+    // Purchases profit se minus nahi hoti, wo sirf maloomat hai.
     function calc(a, b) {
         var s = inRange(sales, a, b);
         var p = inRange(purchases, a, b);
         var e = inRange(expenses, a, b);
-        var S = sum(s), P = sum(p), E = sum(e);
-        return { s: s, p: p, e: e, S: S, P: P, E: E, profit: S - P - E, margin: S ? ((S - P - E) / S) * 100 : 0 };
+        var it = inRange(items, a, b);
+        var S = sum(s), C = sumKey(s, 'cost'), P = sum(p), E = sum(e);
+        var gross = S - C;
+        var profit = gross - E;
+        return { s: s, p: p, e: e, it: it, S: S, C: C, P: P, E: E, gross: gross, profit: profit, margin: S ? (profit / S) * 100 : 0 };
     }
 
     function group(list, key) {
@@ -69,6 +76,48 @@
             map[k].count += 1;
         });
         return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.value - a.value; });
+    }
+
+    function groupSales(list) {
+        var map = {};
+        list.forEach(function (x) {
+            if (!map[x.name]) { map[x.name] = { name: x.name, value: 0, profit: 0, count: 0 }; }
+            map[x.name].value += x.amount;
+            map[x.name].profit += x.amount - x.cost;
+            map[x.name].count += 1;
+        });
+        return Object.keys(map).map(function (k) { return map[k]; }).sort(function (a, b) { return b.profit - a.profit; });
+    }
+
+    function groupProducts(list) {
+        var map = {};
+        list.forEach(function (x) {
+            var k = x.product || 'Unknown product';
+            if (!map[k]) { map[k] = { name: k, qty: 0, revenue: 0, cost: 0, unknown: false }; }
+            map[k].qty += x.qty;
+            map[k].revenue += x.revenue;
+            map[k].cost += x.cost;
+            if (x.unknown) { map[k].unknown = true; }
+        });
+        return Object.keys(map).map(function (k) {
+            var m = map[k];
+            m.profit = m.revenue - m.cost;
+            m.margin = m.revenue ? (m.profit / m.revenue) * 100 : 0;
+            return m;
+        }).sort(function (a, b) { return b.profit - a.profit; });
+    }
+
+    var LOW_MARGIN = 10;
+    var GREEN = '#22c55e', AMBER = '#f59e0b', RED = '#ef4444';
+
+    // Bar ka rang: hara = achha munafa, peela = kam margin, laal = nuksaan
+    function toneOf(p) { return p.profit < 0 ? RED : (p.margin < LOW_MARGIN ? AMBER : GREEN); }
+
+    function profitRow(label, profit, base, color, extra) {
+        var pct = profit !== 0 ? Math.max(2, Math.min(100, Math.round((Math.abs(profit) / base) * 100))) : 0;
+        return '<div class="rp-row"><span class="rp-row-label" title="' + esc(label + (extra || '')) + '">' + esc(label) + '</span>' +
+            '<div class="rp-track"><div class="rp-fill" style="background:' + color + '" data-w="' + pct + '"></div></div>' +
+            '<b style="color:' + (profit < 0 ? RED : 'inherit') + '">' + money(profit) + '</b></div>';
     }
 
     function delta(curV, prevV, goodUp) {
@@ -113,23 +162,26 @@
 
     // ---------- Reports ----------
     function viewPL() {
-        var gross = cur.S - cur.P;
-        var base = Math.max(cur.S, cur.P + cur.E, 1);
+        var base = Math.max(cur.S, cur.C + cur.E, 1);
         var cats = group(cur.e, 'category');
 
-        csv = [['Item', 'Amount'], ['Sales', cur.S], ['Purchases', cur.P], ['Gross profit', gross]];
+        csv = [['Item', 'Amount'], ['Sales (without tax)', cur.S], ['Cost of goods sold', cur.C], ['Gross profit', cur.gross]];
         cats.forEach(function (c) { csv.push(['Expense: ' + c.name, c.value]); });
         csv.push(['Net profit', cur.profit]);
+        csv.push(['Purchases in this period (information only)', cur.P]);
 
         var left = '<div class="rp-card"><h3>Profit and Loss</h3>' +
-            barRow('Sales', cur.S, base, 'f-sales') +
-            barRow('Purchases', cur.P, base, 'f-buy', '- ') +
-            '<div class="rp-subtotal"><span>Gross profit</span><b>' + money(gross) + '</b></div>' +
+            barRow('Sales (without tax)', cur.S, base, 'f-sales') +
+            barRow('Cost of goods sold', cur.C, base, 'f-buy', '- ') +
+            '<div class="rp-subtotal"><span>Gross profit</span><b>' + money(cur.gross) + '</b></div>' +
             '<h4>Operating expenses</h4>' +
             (cats.length ? cats.map(function (c) { return barRow(c.name, c.value, base, 'f-exp', '- '); }).join('') : '<div class="rp-empty">No expenses in this period</div>') +
-            '<div class="rp-net ' + (cur.profit >= 0 ? 'pos' : 'neg') + '"><span>Net profit</span><b>' + money(cur.profit) + '</b></div></div>';
+            '<div class="rp-net ' + (cur.profit >= 0 ? 'pos' : 'neg') + '"><span>Net profit</span><b>' + money(cur.profit) + '</b></div>' +
+            '<h4>For your information</h4>' +
+            '<div class="rp-item"><div>Purchases in this period<small>Not taken off your profit. Stock you bought but have not sold yet is not a loss.</small></div><b>' + money(cur.P) + '</b></div>' +
+            '</div>';
 
-        var rows = [['Sales', cur.S, prev.S, true], ['Purchases', cur.P, prev.P, false], ['Expenses', cur.E, prev.E, false], ['Net profit', cur.profit, prev.profit, true]];
+        var rows = [['Sales', cur.S, prev.S, true], ['Cost of goods sold', cur.C, prev.C, false], ['Expenses', cur.E, prev.E, false], ['Net profit', cur.profit, prev.profit, true]];
         var right = '<div class="rp-card"><h3>Compared with previous period</h3>' + rows.map(function (r) {
             return '<div class="rp-cmp"><div><div class="rp-cmp-name">' + r[0] + '</div><div class="rp-cmp-sub">Before: ' + money(r[2]) + '</div></div>' +
                 '<div class="rp-cmp-right"><b>' + money(r[1]) + '</b>' + delta(r[1], r[2], r[3]) + '</div></div>';
@@ -139,11 +191,10 @@
     }
 
     function viewSales() {
-        var top = group(cur.s, 'name');
-        var avg = cur.s.length ? cur.S / cur.s.length : 0;
+        var top = groupSales(cur.s);
 
-        csv = [['Customer', 'Invoices', 'Amount']];
-        top.forEach(function (c) { csv.push([c.name, c.count, c.value]); });
+        csv = [['Customer', 'Invoices', 'Sales (without tax)', 'Profit']];
+        top.forEach(function (c) { csv.push([c.name, c.count, c.value, c.profit]); });
 
         // Pichle 6 mahine ka trend
         var months = [];
@@ -154,14 +205,18 @@
             months.push({ label: d.toLocaleDateString('en-GB', { month: 'short' }), total: total, on: key >= range.s.slice(0, 7) && key <= range.e.slice(0, 7) });
         }
         var max = Math.max.apply(null, months.map(function (x) { return x.total; })) || 1;
+        var biggest = top.reduce(function (m, c) { return Math.max(m, Math.abs(c.profit)); }, 0) || 1;
 
-        var left = '<div class="rp-card"><h3>Top customers</h3>' +
+        var left = '<div class="rp-card"><h3>Profit from each customer</h3>' +
             '<div class="rp-stats">' +
             '<div class="rp-stat"><span>Total sales</span><b>' + money(cur.S) + '</b></div>' +
+            '<div class="rp-stat"><span>Profit on sales</span><b>' + money(cur.gross) + '</b></div>' +
             '<div class="rp-stat"><span>Invoices</span><b>' + cur.s.length + '</b></div>' +
-            '<div class="rp-stat"><span>Average invoice</span><b>' + money(avg) + '</b></div>' +
             '</div>' +
-            (top.length ? top.map(function (c) { return barRow(c.name, c.value, top[0].value, 'f-sales'); }).join('') : '<div class="rp-empty">No sales in this period</div>') +
+            (top.length ? top.map(function (c) {
+                return profitRow(c.name, c.profit, biggest, c.profit < 0 ? RED : GREEN, ' - sales ' + money(c.value));
+            }).join('') : '<div class="rp-empty">No sales in this period</div>') +
+            '<div class="rp-cmp-sub" style="margin-top:12px">Profit here means sales minus the cost of the goods sold, before expenses.</div>' +
             '</div>';
 
         var right = '<div class="rp-card"><h3>Sales trend, last 6 months</h3><div class="rp-cols">' +
@@ -172,6 +227,34 @@
             }).join('') + '</div></div>';
 
         return '<div class="rp-split">' + left + right + '</div>';
+    }
+
+    function viewProducts() {
+        var prods = groupProducts(cur.it);
+        var biggest = prods.reduce(function (m, p) { return Math.max(m, Math.abs(p.profit)); }, 0) || 1;
+        var watch = prods.filter(function (p) { return p.profit < 0 || p.margin < LOW_MARGIN; })
+            .sort(function (a, b) { return a.margin - b.margin; });
+
+        csv = [['Product', 'Quantity sold', 'Sales (without tax)', 'Cost', 'Profit', 'Margin %']];
+        prods.forEach(function (p) { csv.push([p.name, p.qty, p.revenue, p.cost, p.profit, p.margin.toFixed(1)]); });
+
+        var left = '<div class="rp-card"><h3>Products by profit</h3>' +
+            (prods.length ? prods.map(function (p) {
+                return profitRow(p.name, p.profit, biggest, toneOf(p), ' - margin ' + p.margin.toFixed(1) + '%');
+            }).join('') : '<div class="rp-empty">No products sold in this period</div>') +
+            '<div class="rp-cmp-sub" style="margin-top:12px">' +
+            '<span style="color:' + GREEN + '">Green</span> = good profit, ' +
+            '<span style="color:' + AMBER + '">yellow</span> = margin below ' + LOW_MARGIN + '%, ' +
+            '<span style="color:' + RED + '">red</span> = selling at a loss.</div></div>';
+
+        var right = '<div class="rp-card"><h3>Keep an eye on these</h3>' +
+            (watch.length ? watch.map(function (p) {
+                return '<div class="rp-item"><div>' + esc(p.name) + '<small>' + (p.profit < 0 ? 'Selling at a loss' : 'Very low margin') +
+                    ' (' + p.margin.toFixed(1) + '%) - sold ' + p.qty + '</small></div><b style="color:' + toneOf(p) + '">' + money(p.profit) + '</b></div>';
+            }).join('') : '<div class="rp-empty">No product is selling at a loss or at a very low margin.</div>') +
+            '</div>';
+
+        return '<div class="rp-split even">' + left + right + '</div>';
     }
 
     function viewExpenses() {
@@ -242,7 +325,7 @@
         var diff = cur.margin - prev.margin;
         var cards = [
             { label: 'Revenue', icon: 'fa-arrow-trend-up', cls: 'c-sales', value: cur.S, fmt: money, d: delta(cur.S, prev.S, true) },
-            { label: 'Costs', icon: 'fa-wallet', cls: 'c-cost', value: cur.P + cur.E, fmt: money, d: delta(cur.P + cur.E, prev.P + prev.E, false) },
+            { label: 'Costs', icon: 'fa-wallet', cls: 'c-cost', value: cur.C + cur.E, fmt: money, d: delta(cur.C + cur.E, prev.C + prev.E, false) },
             { label: 'Net Profit', icon: 'fa-sack-dollar', cls: 'c-profit', value: cur.profit, fmt: money, d: delta(cur.profit, prev.profit, true) },
             {
                 label: 'Profit Margin', icon: 'fa-percent', cls: 'c-margin', value: cur.margin, fmt: function (v) { return v.toFixed(1) + '%'; },
@@ -269,15 +352,31 @@
         text += '. ';
 
         var cat = group(cur.e, 'category')[0];
-        var cust = group(cur.s, 'name')[0];
-        if (cat) { text += 'The biggest expense category is ' + cat.name + ' (' + money(cat.value) + '). '; }
-        if (cust) { text += 'Your top customer is ' + cust.name + ' with ' + money(cust.value) + ' in sales.'; }
+        var prods = groupProducts(cur.it);
+        var best = prods.filter(function (p) { return p.profit > 0; })[0];
+        var losing = prods.filter(function (p) { return p.profit < 0; });
+
+        if (best) { text += 'The product earning the most is ' + best.name + ' (' + money(best.profit) + '). '; }
+        if (losing.length) { text += losing[0].name + (losing.length > 1 ? ' and ' + (losing.length - 1) + ' more are' : ' is') + ' selling at a loss. '; }
+        if (cat) { text += 'The biggest expense category is ' + cat.name + ' (' + money(cat.value) + ').'; }
 
         $('rpInsight').textContent = text;
     }
 
+    function renderNote() {
+        var unknown = cur.it.filter(function (x) { return x.unknown; }).length;
+        var estimated = cur.it.filter(function (x) { return x.estimated; }).length;
+        var text = '';
+
+        if (unknown) { text += 'The cost of some sales is not known, so their profit may look higher than it really is. '; }
+        if (estimated) { text += 'Some older sales use the product\'s current cost because the cost was not saved at that time.'; }
+
+        $('rpNote').textContent = text;
+        $('rpNote').style.display = text ? 'block' : 'none';
+    }
+
     function renderBody() {
-        var views = { pl: viewPL, sales: viewSales, exp: viewExpenses, age: viewAging };
+        var views = { pl: viewPL, sales: viewSales, prod: viewProducts, exp: viewExpenses, age: viewAging };
         $('rpBody').innerHTML = '<div class="rp-view">' + views[state.tab]() + '</div>';
 
         // Animation shuru
@@ -299,6 +398,7 @@
         $('rpRange').textContent = fmtD(range.s) + ' to ' + fmtD(range.e) + '  (compared with ' + fmtD(range.ps) + ' to ' + fmtD(range.pe) + ')';
         renderCards();
         renderInsight();
+        renderNote();
         renderBody();
     }
 
@@ -342,6 +442,7 @@
         })
         .then(function (data) {
             sales = data.sales;
+            items = data.items;
             purchases = data.purchases;
             expenses = data.expenses;
             receivables = data.receivables;

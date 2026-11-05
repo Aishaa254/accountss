@@ -45,7 +45,7 @@
         <div class="db-chart" id="dbChart"></div>
         <div class="db-legend">
             <span><i class="db-dot sales"></i>Sales</span>
-            <span><i class="db-dot spend"></i>Purchases + Expenses</span>
+            <span><i class="db-dot spend"></i>Cost of goods sold + Expenses</span>
         </div>
     </div>
 

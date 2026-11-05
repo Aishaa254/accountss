@@ -117,7 +117,7 @@
                 '<td><div class="vd-name">' + esc(e.title) + '</div>' +
                     (e.note ? '<div class="vd-company">' + esc(e.note) + '</div>' : '') + '</td>' +
                 '<td><span class="vd-tag">' + esc(e.category) + '</span></td>' +
-                '<td>' + esc(e.method) + '</td>' +
+                '<td>' + esc(e.account || '-') + '<div class="vd-company">' + esc(e.method) + '</div></td>' +
                 '<td><div class="vd-amount">' + money(e.amount) + '</div></td>' +
                 '<td class="ex-actions">' +
                     '<button type="button" class="vd-dots" data-act="edit" data-id="' + e.id + '" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>' +
@@ -150,22 +150,36 @@
     $('efCategory').innerHTML = options;
     $('exCat').innerHTML = '<option value="all">All categories</option>' + options;
 
+    function toggleExMethod() {
+        var cash = AccountPicker.isCash($('efAccount'));
+        $('efMethodBox').style.display = cash ? 'none' : '';
+        $('efRefBox').style.display = cash ? 'none' : '';
+    }
+
     function openForm(e) {
         editingId = e ? e.id : null;
-        ['efTitle', 'efAmount', 'efDate'].forEach(function (id) { setErr(id, ''); });
+        ['efTitle', 'efAmount', 'efDate', 'efAccount'].forEach(function (id) { setErr(id, ''); });
 
         $('exTitle').textContent = e ? 'Edit Expense' : 'Add Expense';
         $('efTitle').value = e ? e.title : '';
         $('efAmount').value = e ? e.amount : '';
         $('efDate').value = e ? e.date : today();
         $('efCategory').value = e ? e.category : 'Other';
-        $('efMethod').value = e ? e.method : 'Cash';
+        $('efMethod').value = e ? e.method : 'Bank Transfer';
+        $('efRef').value = e ? (e.reference || '') : '';
         $('efNote').value = e ? e.note : '';
 
         openModal('exModal');
         setTimeout(function () { $('efTitle').focus(); }, 60);
+
+        AccountPicker.load().then(function (list) {
+            AccountPicker.fill($('efAccount'), list);
+            if (e && e.account_id) { $('efAccount').value = e.account_id; }
+            toggleExMethod();
+        });
     }
 
+    $('efAccount').addEventListener('change', toggleExMethod);
     $('exNew').addEventListener('click', function () { openForm(null); });
 
     $('efSave').addEventListener('click', function () {
@@ -174,7 +188,8 @@
         var date = $('efDate').value;
         var ok = true;
 
-        ['efTitle', 'efAmount', 'efDate'].forEach(function (id) { setErr(id, ''); });
+       
+        ['efTitle', 'efAmount', 'efDate', 'efAccount'].forEach(function (id) { setErr(id, ''); });
 
         if (title.length < 2) { setErr('efTitle', 'Enter a title (at least 2 letters)'); ok = false; }
         if (isNaN(amount) || amount <= 0) { setErr('efAmount', 'Enter an amount greater than 0'); ok = false; }
@@ -183,6 +198,8 @@
         if (!date) { setErr('efDate', 'Choose the date'); ok = false; }
         else if (date > today()) { setErr('efDate', 'Date cannot be in the future'); ok = false; }
 
+        if (!$('efAccount').value) { setErr('efAccount', 'Choose the account the money is paid from'); ok = false; }
+
         if (!ok) { return; }
 
         var data = {
@@ -190,7 +207,9 @@
             amount: Math.round(amount * 100) / 100,
             date: date,
             category: $('efCategory').value,
-            method: $('efMethod').value,
+            account_id: Number($('efAccount').value),
+            method: AccountPicker.isCash($('efAccount')) ? 'Cash' : $('efMethod').value,
+            reference: $('efRef').value.trim(),
             note: $('efNote').value.trim()
         };
 

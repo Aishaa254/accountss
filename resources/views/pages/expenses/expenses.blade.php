@@ -8,7 +8,9 @@
 @endpush
 
 @push('scripts')
+<script src="{{ asset('js/accounts/account-picker.js') }}"></script>
 <script src="{{ asset('js/expenses/expenses.js') }}"></script>
+
 @endpush
 
 @section('content')
@@ -75,7 +77,7 @@
                     <th>Date</th>
                     <th>Expense</th>
                     <th>Category</th>
-                    <th>Method</th>
+                    <th>Paid from</th>
                     <th>Amount</th>
                     <th></th>
                 </tr>
@@ -123,13 +125,26 @@
                 </div>
 
                 <div class="vd-field">
-                    <label>Payment Method</label>
-                    <select class="vd-input" id="efMethod">
-                        <option>Cash</option>
-                        <option>Bank Transfer</option>
-                        <option>Cheque</option>
-                        <option>Online</option>
-                    </select>
+                    <label>Paid from <span class="vd-req">*</span></label>
+                    <select class="vd-input" id="efAccount"></select>
+                    <small class="vd-err" data-err="efAccount"></small>
+                </div>
+
+                <div style="display:none">
+                    <div class="vd-field" id="efMethodBox">
+                        <label>Payment Method</label>
+                        <select class="vd-input" id="efMethod">
+                            <option>Bank Transfer</option>
+                            <option>Cheque</option>
+                            <option>Online</option>
+                            <option>Cash</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="vd-field" id="efRefBox">
+                    <label>Reference no.</label>
+                    <input type="text" class="vd-input" id="efRef" maxlength="60" placeholder="Optional">
                 </div>
 
                 <div class="vd-field vd-full">

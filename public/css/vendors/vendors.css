@@ -707,3 +707,32 @@ textarea.vd-input { resize: vertical; }
     .vd-grid { grid-template-columns: 1fr; }
     .vd-foot { justify-content: center; }
 }
+/* Sort aur Rows ke dropdown ki chaurai */
+#vendorSortBox { min-width: 220px; }
+#vdPerPageBox { width: 100px; display: inline-block; vertical-align: middle; }
+
+/* Payment Terms: - 30 + */
+.vd-step {
+    display: flex; align-items: center;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); overflow: hidden;
+    transition: border-color .15s ease;
+}
+.vd-step:focus-within { border-color: var(--main); }
+.vd-step:has(.vd-invalid) { border-color: #e11d48; }
+.vd-step .vd-input {
+    border: none !important; background: transparent !important;
+    box-shadow: none !important; text-align: center; flex: 1; min-width: 0;
+}
+.vd-step-btn {
+    width: 40px; align-self: stretch; border: none; background: transparent;
+    color: var(--muted); font-size: 11px; cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.vd-step-btn:hover { background: var(--main); color: #fff; }
+
+/* Is page ke saare number boxes ke default arrows band */
+.vd-input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.vd-input[type=number]::-webkit-inner-spin-button,
+.vd-input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+.vd-invalid + .pp { border-color: #e11d48; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15); }

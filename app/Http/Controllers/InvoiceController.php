@@ -7,6 +7,10 @@ use App\Models\Product;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\Account;
+use App\Services\AccountLedger;
+use Illuminate\Validation\Rule;
+use App\Models\User;
 
 class InvoiceController extends Controller
 {
@@ -20,7 +24,9 @@ class InvoiceController extends Controller
 
     public function index()
     {
-        $invoices = Invoice::with(['items', 'customer', 'payments'])->orderByDesc('id')->get()->map(function ($inv) {
+        $names = User::pluck('name', 'id');
+
+        $invoices = Invoice::with(['items', 'customer', 'payments.account'])->orderByDesc('id')->get()->map(function ($inv) use ($names) {
             return [
                 'no' => $inv->no,
                 'customer' => $inv->customer->name,
@@ -32,6 +38,16 @@ class InvoiceController extends Controller
                 'discount' => $inv->discount,
                 'tax' => $inv->tax,
                 'paid' => $inv->paidAmount(),
+                'payments' => $inv->payments->map(function ($p) use ($names) {
+                    return [
+                        'date' => $p->date,
+                        'amount' => $p->amount,
+                        'account' => $p->account ? $p->account->name : '',
+                        'method' => $p->method ?? '',
+                        'reference' => $p->reference ?? '',
+                        'by' => $p->created_by ? ($names[$p->created_by] ?? '') : '',
+                    ];
+                })->sortBy('date')->values(),
             ];
         });
 
@@ -134,29 +150,53 @@ class InvoiceController extends Controller
 
         return response()->json(['no' => $invoice->no]);
     }
-
     public function pay(Request $request, Invoice $invoice)
     {
-        $invoice->load(['items', 'payments']);
+        $invoice->load(['items', 'payments', 'customer']);
 
         $balance = $invoice->balance();
 
         $data = $request->validate([
             'amount' => 'required|numeric|gt:0|lte:' . ceil($balance),
             'date' => 'nullable|date|before_or_equal:today|after_or_equal:' . $invoice->date,
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('active', true)],
+            'reference' => 'nullable|string|max:60',
+        ], [
+            'account_id.required' => 'Choose where the money was received.',
+            'account_id.exists' => 'This account is not available.',
         ]);
 
         $amount = min($data['amount'], $balance);
+        $account = Account::findOrFail($data['account_id']);
 
-        $payment = $invoice->payments()->create([
-            'amount' => $amount,
-            'date' => $data['date'] ?? now()->toDateString(),
-        ]);
+        DB::transaction(function () use ($invoice, $data, $amount, $account) {
+            $payment = $invoice->payments()->create([
+                'amount' => $amount,
+                'date' => $data['date'] ?? now()->toDateString(),
+                'account_id' => $account->id,
+                'method' => $account->type === 'cash' ? 'Cash' : 'Bank',
+                'reference' => $data['reference'] ?? null,
+            ]);
 
-        $this->stamp($payment);
+            $this->stamp($payment);
+
+            AccountLedger::post(
+                $account,
+                'in',
+                (float) $amount,
+                (string) $payment->date,
+                'payment_in',
+                'invoice_payment',
+                $payment->id,
+                $payment->method,
+                $payment->reference,
+                'Received ' . $invoice->no . ' from ' . $invoice->customer->name
+            );
+        });
 
         return response()->json(['ok' => true]);
     }
+    
 
     public function destroy(Invoice $invoice)
     {

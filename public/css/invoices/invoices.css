@@ -14,10 +14,10 @@
 .inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 22px; }
 .sec-label { display: block; font-size: 13px; font-weight: 600; margin: 16px 0 8px; }
 
-.item-row { display: grid; grid-template-columns: 1fr 70px 110px 34px; gap: 8px; margin-bottom: 8px; }
+.item-row { display: grid; grid-template-columns: 1fr 116px 110px 34px; gap: 8px; margin-bottom: 8px; }
 .item-head {
     display: grid;
-    grid-template-columns: 1fr 70px 110px 34px;
+    grid-template-columns: 1fr 116px 110px 34px;
     gap: 8px;
     margin-bottom: 6px;
     font-size: 12px;
@@ -112,3 +112,28 @@
 .item-row .it-stock { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin-top: -2px; }
 .item-row .it-stock:empty { display: none; }
 .item-row .it-stock.warn { color: #d97706; font-weight: 600; }
+.qty-box {
+    display: flex; align-items: center;
+    border: 1px solid var(--border); border-radius: 10px;
+    background: var(--bg); overflow: hidden;
+    transition: border-color .15s ease;
+}
+.qty-box:focus-within { border-color: var(--main); }
+.qty-box:has(.is-invalid) { border-color: #e11d48; }
+
+.qty-box input {
+    border: none; background: transparent; text-align: center;
+    padding: 10px 0; min-width: 0; flex: 1;
+}
+.qty-box input:focus { border: none; }
+
+.qty-box button {
+    width: 32px; align-self: stretch; border: none; background: transparent;
+    color: var(--muted); font-size: 11px; cursor: pointer;
+    transition: background .15s ease, color .15s ease;
+}
+.qty-box button:hover { background: var(--main); color: #fff; }
+
+.item-row .it-price[type=number] { -moz-appearance: textfield; appearance: textfield; }
+.item-row .it-price::-webkit-inner-spin-button,
+.item-row .it-price::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }

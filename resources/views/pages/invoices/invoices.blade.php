@@ -6,11 +6,16 @@
     <link rel="stylesheet" href="{{ asset('css/customers/customers.css') }}">
     <link rel="stylesheet" href="{{ asset('css/invoices/invoices.css') }}">
     <link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
+    <link rel="stylesheet" href="{{ asset('css/shared/date-filter.css') }}">
 @endpush
 
 @push('scripts')
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
     <script src="{{ asset('js/shared/product-picker.js') }}"></script>
+    <script src="{{ asset('js/shared/date-filter.js') }}"></script>
+    <script src="{{ asset('js/shared/select-picker.js') }}"></script>
+    <script src="{{ asset('js/accounts/account-picker.js') }}"></script>
+    <script src="{{ asset('js/shared/customer-picker.js') }}"></script>
     <script src="{{ asset('js/invoices/invoices.js') }}"></script>
 @endpush
 
@@ -45,27 +50,24 @@
     </div>
 
     <div class="cust-box">
-        <div class="cust-toolbar">
+        <div class="cust-toolbar fb-toolbar">
             <div class="cust-search">
                 <i class="fa-solid fa-magnifying-glass"></i>
                 <input type="text" id="search-box" placeholder="Search by invoice number or customer...">
             </div>
-            <div class="cust-filters">
-                <button class="filter-btn active" data-filter="all">All <b id="cnt-all">0</b></button>
-                <button class="filter-btn" data-filter="unpaid">Unpaid <b id="cnt-unpaid">0</b></button>
-                <button class="filter-btn" data-filter="partial">Partial <b id="cnt-partial">0</b></button>
-                <button class="filter-btn" data-filter="paid">Paid <b id="cnt-paid">0</b></button>
-                <button class="filter-btn" data-filter="overdue">Overdue <b id="cnt-overdue">0</b></button>
-            </div>
+
+            <!-- Bare boxes pehle (Search, From - To), chhota Status baad mein -->
+            <div id="date-filter"></div>
+            <div id="status-filter"></div>
         </div>
 
         <div class="table-wrap">
             <table class="cust-table">
                 <thead>
                     <tr>
+                        <th>Date</th>
                         <th>Invoice</th>
                         <th>Customer</th>
-                        <th>Date</th>
                         <th>Due</th>
                         <th>Amount</th>
                         <th>Payment</th>
@@ -90,7 +92,7 @@
                     <div class="form-grid">
                         <div>
                             <label>Customer <span class="req">*</span></label>
-                            <select id="n-customer"></select>
+                            <div id="n-customer-box"></div>
                             <small class="field-err" data-err="n-customer"></small>
                         </div>
                         <div>
@@ -155,6 +157,8 @@
             <div class="form-grid" style="grid-template-columns:1fr;">
                 <div><label>Amount received (<span class="cur-sym">Rs</span>)</label><input type="number" id="pay-amount"></div>
                 <div><label>Payment date</label><input type="date" id="pay-date"></div>
+                <div><label>Received in</label><select id="pay-account"></select></div>
+                <div id="pay-ref-box"><label>Reference no. (optional)</label><input type="text" id="pay-ref" maxlength="60"></div>
             </div>
             <p class="form-error" id="pay-error"></p>
             <div class="modal-foot">

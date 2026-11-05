@@ -146,20 +146,39 @@ class InventoryController extends Controller
                     ? (int) ceil(max($target - $stock, 0))
                     : 0;
 
+                // Stock ki poori history: purane se naye ki tarteeb mein, har movement ke baad ka balance ke saath
                 $moves = [];
                 foreach ($p->purchaseItems as $i) {
-                    $moves[] = ['date' => $i->purchase->date, 'type' => 'in', 'qty' => $i->qty,
+                    $moves[] = ['date' => $i->purchase->date, 'order' => 1, 'type' => 'in', 'qty' => (float) $i->qty,
                         'ref' => $i->purchase->no, 'party' => $i->purchase->vendor->name, 'note' => ''];
                 }
-                foreach ($p->invoiceItems as $i) {
-                    $moves[] = ['date' => $i->invoice->date, 'type' => 'out', 'qty' => -$i->qty,
-                        'ref' => $i->invoice->no, 'party' => $i->invoice->customer->name, 'note' => ''];
-                }
                 foreach ($p->adjustments as $a) {
-                    $moves[] = ['date' => $a->date, 'type' => 'adj', 'qty' => $a->qty,
+                    $moves[] = ['date' => $a->date, 'order' => 2, 'type' => 'adj', 'qty' => (float) $a->qty,
                         'ref' => $a->reason, 'party' => '', 'note' => $a->note ?? ''];
                 }
-                usort($moves, function ($a, $b) { return strcmp($b['date'], $a['date']); });
+                foreach ($p->invoiceItems as $i) {
+                    $moves[] = ['date' => $i->invoice->date, 'order' => 3, 'type' => 'out', 'qty' => -((float) $i->qty),
+                        'ref' => $i->invoice->no, 'party' => $i->invoice->customer->name, 'note' => ''];
+                }
+                usort($moves, function ($a, $b) { return [$a['date'], $a['order']] <=> [$b['date'], $b['order']]; });
+
+                $balance = (float) $p->opening_stock;
+                foreach ($moves as $k => $m) {
+                    $balance += $m['qty'];
+                    $moves[$k]['balance'] = round($balance, 4);
+                    unset($moves[$k]['order']);
+                }
+
+                // Opening stock sab se pehli row hoti hai
+                if ((float) $p->opening_stock != 0) {
+                    array_unshift($moves, ['date' => $p->created_at->toDateString(), 'type' => 'open', 'qty' => (float) $p->opening_stock,
+                        'ref' => 'Opening stock', 'party' => '', 'note' => '', 'balance' => round((float) $p->opening_stock, 4)]);
+                }
+
+                $moves = array_reverse($moves); // naye pehle
+
+                $adjIn = (float) $p->adjustments->where('qty', '>', 0)->sum('qty');
+                $adjOut = abs((float) $p->adjustments->where('qty', '<', 0)->sum('qty'));
 
                 return [
                     'id' => $p->id,
@@ -186,7 +205,9 @@ class InventoryController extends Controller
                     'idleSince' => $lastSold ?: $p->created_at->toDateString(),
                     'dead' => $dead,
                     'revenue' => $revenue,
-                    'movements' => array_slice($moves, 0, 30),
+                    'totalIn' => round($p->opening_stock + $purchased + $adjIn, 4),
+                    'totalOut' => round($sold + $adjOut, 4),
+                    'movements' => $moves,
                 ];
             });
 

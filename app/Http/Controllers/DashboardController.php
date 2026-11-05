@@ -7,6 +7,7 @@ use App\Models\Expense;
 use App\Models\Invoice;
 use App\Models\Purchase;
 use App\Models\Vendor;
+use App\Support\Profit;
 use Carbon\Carbon;
 
 class DashboardController extends Controller
@@ -15,7 +16,7 @@ class DashboardController extends Controller
     {
         $today = now()->startOfDay();
 
-        $invoices = Invoice::with(['items', 'payments', 'customer'])->get();
+        $invoices = Invoice::with(['items.product', 'payments', 'customer'])->get();
         $purchases = Purchase::with(['items', 'payments', 'vendor'])->get();
         $expenses = Expense::all();
         $customers = Customer::with(['invoices.items', 'invoices.payments'])->get();
@@ -38,9 +39,32 @@ class DashboardController extends Controller
             return array_values(array_map(function ($v) { return round($v, 2); }, $out));
         };
 
-        $sales = $monthly($invoices, function ($r) { return $r->total(); });
+        // Sales tax ke baghair, aur bike hue maal ki cost (asli profit ke liye)
+        $revenueByMonth = array_fill_keys($months, 0);
+        $costByMonth = array_fill_keys($months, 0);
+
+        foreach ($invoices as $inv) {
+            $m = substr($inv->date, 0, 7);
+
+            if (!isset($revenueByMonth[$m])) {
+                continue;
+            }
+
+            $lines = Profit::lines($inv);
+            $revenueByMonth[$m] += array_sum(array_column($lines, 'revenue'));
+            $costByMonth[$m] += array_sum(array_column($lines, 'cost'));
+        }
+
+        $sales = array_values(array_map(function ($v) { return round($v, 2); }, $revenueByMonth));
+        $cogs = array_values(array_map(function ($v) { return round($v, 2); }, $costByMonth));
         $purchaseTotals = $monthly($purchases, function ($r) { return $r->total(); });
         $expenseTotals = $monthly($expenses, function ($r) { return $r->amount; });
+
+        // Net profit = Sales - bike hue maal ki cost - Expenses (Purchases minus nahi hoti)
+        $profit = [];
+        foreach ($sales as $k => $v) {
+            $profit[] = round($v - $cogs[$k] - $expenseTotals[$k], 2);
+        }
 
         // ----- Receivable and payable -----
         $customerBalance = function ($c) {
@@ -209,6 +233,8 @@ class DashboardController extends Controller
 
         return response()->json([
             'sales' => $sales,
+            'cogs' => $cogs,
+            'profit' => $profit,
             'purchases' => $purchaseTotals,
             'expenses' => $expenseTotals,
             'receivable' => round($receivable, 2),

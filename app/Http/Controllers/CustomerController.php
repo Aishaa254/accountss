@@ -5,6 +5,9 @@ use App\Models\Customer;
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use App\Models\Account;
+use App\Services\AccountLedger;
+use Illuminate\Validation\Rule;
 
 class CustomerController extends Controller
 {
@@ -113,9 +116,17 @@ class CustomerController extends Controller
         $data = $request->validate([
             'amount' => 'required|numeric|gt:0|lte:' . $totalDue,
             'date' => 'required|date|before_or_equal:today',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('active', true)],
+            'reference' => 'nullable|string|max:60',
+        ], [
+            'account_id.required' => 'Choose where the money was received.',
+            'account_id.exists' => 'This account is not available.',
         ]);
 
-        DB::transaction(function () use ($open, $data) {
+        $account = Account::findOrFail($data['account_id']);
+        $method = $account->type === 'cash' ? 'Cash' : 'Bank';
+
+        DB::transaction(function () use ($open, $data, $account, $method, $customer) {
             $left = round((float) $data['amount'], 2);
 
             foreach ($open as $inv) {
@@ -123,15 +134,34 @@ class CustomerController extends Controller
 
                 $pay = min($left, $inv->balance());
 
-                $inv->payments()->create([
+                $payment = $inv->payments()->create([
                     'amount' => $pay,
                     'date' => $data['date'],
+                    'account_id' => $account->id,
+                    'method' => $method,
+                    'reference' => $data['reference'] ?? null,
                 ]);
+
+                if (\Illuminate\Support\Facades\Schema::hasColumn('invoice_payments', 'created_by')) {
+                    $payment->forceFill(['created_by' => auth()->id()])->save();
+                }
+
+                AccountLedger::post(
+                    $account,
+                    'in',
+                    (float) $pay,
+                    $data['date'],
+                    'payment_in',
+                    'invoice_payment',
+                    $payment->id,
+                    $method,
+                    $data['reference'] ?? null,
+                    'Received ' . $inv->no . ' from ' . $customer->name
+                );
 
                 $left = round($left - $pay, 2);
             }
         });
-
         return response()->json(['ok' => true]);
     }
 }

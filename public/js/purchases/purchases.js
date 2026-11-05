@@ -60,7 +60,6 @@
     function loadVendors() {
         return api('GET', '/vendors/list').then(function (data) {
             vendorsData = data.filter(function (v) { return v.status === 'active'; });
-            fillVendorSelect();
             render();
         });
     }
@@ -73,6 +72,10 @@
     }
 
     var state = { filter: 'all', search: '', sort: 'new' };
+    var dateFilter = null;  // date / month ka box (shared/date-filter.js)
+    var statusBox = null;   // Paid / Unpaid wala box
+
+    function inDateRange(p) { return dateFilter ? dateFilter.match(p.date) : true; }
     var openId = null;
     var current = null;
     var editingId = null;
@@ -162,11 +165,20 @@
         $('cdOverdue').textContent = money(lateAmount);
         $('cdOverdueNote').textContent = late.length + ' purchase(s) late';
 
-        $('cAll').textContent = purchases.length;
-        $('cUnpaid').textContent = purchases.filter(function (p) { return calc(p).status === 'Unpaid'; }).length;
-        $('cPartial').textContent = purchases.filter(function (p) { return calc(p).status === 'Partial'; }).length;
-        $('cPaid').textContent = purchases.filter(function (p) { return calc(p).status === 'Paid'; }).length;
-        $('cOverdue').textContent = late.length;
+        // Status ke numbers sirf chune hue date range ki purchases ginte hain
+        var scoped = purchases.filter(inDateRange);
+
+        if (statusBox) {
+            statusBox.setCounts({
+                all: scoped.length,
+                Unpaid: scoped.filter(function (p) { return calc(p).status === 'Unpaid'; }).length,
+                Partial: scoped.filter(function (p) { return calc(p).status === 'Partial'; }).length,
+                Paid: scoped.filter(function (p) { return calc(p).status === 'Paid'; }).length,
+                overdue: scoped.filter(function (p) { return calc(p).overdue; }).length
+            });
+        }
+
+        if (dateFilter) { dateFilter.setCount(scoped.length, purchases.length); }
     }
 
     // ---------- List ----------
@@ -174,6 +186,7 @@
         var q = state.search.trim().toLowerCase();
 
         var list = purchases.filter(function (p) {
+            if (!inDateRange(p)) { return false; }
             var c = calc(p);
             if (state.filter === 'overdue') {
                 if (!c.overdue) { return false; }
@@ -199,13 +212,13 @@
         var note = dueNote(c);
 
         return '<tr>' +
+            '<td>' + fmt(p.date) + '</td>' +
             '<td><div class="pu-po">' + esc(p.no) + '</div>' +
                 '<div class="pu-sub">' + p.items.length + ' item(s)</div></td>' +
             '<td><div class="vd-vendor">' +
                 '<span class="vd-avatar ' + avatarClass(p.vendor) + '">' + esc(p.vendor.charAt(0).toUpperCase()) + '</span>' +
                 '<div class="vd-name">' + esc(p.vendor) + '</div>' +
             '</div></td>' +
-            '<td>' + fmt(p.date) + '</td>' +
             '<td><div>' + fmt(p.due) + '</div>' +
                 '<div class="pu-sub' + (note.red ? ' vd-red' : '') + '">' + esc(note.text) + '</div></td>' +
             '<td><div class="vd-amount">' + money(c.total) + '</div></td>' +
@@ -392,12 +405,15 @@
 
     // ---------- New / Edit form ----------
     var formIds = ['pfVendor', 'pfDate', 'pfDue', 'pfItems'];
+    var vendorPicker = CustomerPicker.create({
+        noun: 'vendor',
+        customers: function () { return vendorsData; },
+        onSelect: function () { setErr('pfVendor', ''); }
+    });
+    vendorPicker.el.id = 'pfVendor';
+    $('pfVendorBox').appendChild(vendorPicker.el);
 
-    function fillVendorSelect() {
-        $('pfVendor').innerHTML = '<option value="">Select vendor</option>' + vendorsData.map(function (v) {
-            return '<option value="' + v.id + '">' + esc(v.name) + '</option>';
-        }).join('');
-    }
+   
 
     function addItemRow(it) {
         var row = document.createElement('div');
@@ -469,13 +485,13 @@
         $('pfTitle').textContent = p ? 'Edit ' + p.no : 'New Purchase';
         $('pfSave').textContent = p ? 'Save Changes' : 'Save Purchase';
 
-        $('pfVendor').value = p ? String(p.vendor_id) : '';
+        vendorPicker.set(p ? p.vendor_id : null);
         $('pfDate').value = p ? p.date : todayStr();
         $('pfDue').value = p ? p.due : addDays(todayStr(), 30);
         $('pfNotes').value = p ? p.notes : '';
 
         $('pfItemRows').innerHTML = '';
-        if (p) { p.items.forEach(function (d) { addItemRow({ product_id: d.product_id, name: d.desc, desc: '', qty: d.qty, price: d.price }); }); } else { addItemRow(); }
+        if (p) { p.items.forEach(function (d) { addItemRow({ product_id: d.product_id, name: d.name, desc: d.desc, qty: d.qty, price: d.price, sale_price: d.sale_price }); }); } else { addItemRow(); }
 
         recalcForm();
         openModal('puFormModal');
@@ -516,7 +532,7 @@
         clearErrs(formIds);
         var ok = true;
 
-        var vendor = $('pfVendor').value;
+        var vendor = vendorPicker.get();
         var date = $('pfDate').value;
         var due = $('pfDue').value;
 
@@ -595,71 +611,93 @@
     $('pfSave').addEventListener('click', savePurchase);
 
     // ---------- Record Payment ----------
-    var payIds = ['ppAmount', 'ppDate'];
+       // ---------- Record Payment ----------
+       var payIds = ['ppAmount', 'ppDate', 'ppAccount'];
 
-    function openPay(p) {
-        payingId = p.id;
-        clearErrs(payIds);
-
-        $('ppSummary').innerHTML = '<div class="vd-pay-name">' + esc(p.no) + ' - ' + esc(p.vendor) + '</div>' +
-            '<div class="vd-pay-bal">Balance to pay: <b>' + money(calc(p).balance) + '</b></div>';
-
-        $('ppAmount').value = '';
-        $('ppDate').value = todayStr();
-        $('ppMethod').value = 'Cash';
-
-        openModal('puPayModal');
-        setTimeout(function () { $('ppAmount').focus(); }, 60);
-    }
-
-    $('ppFull').addEventListener('click', function () {
-        var p = find(payingId);
-        if (p) { $('ppAmount').value = calc(p).balance; }
-    });
-
-    $('ppSave').addEventListener('click', function () {
-        var p = find(payingId);
-        if (!p) { return; }
-
-        clearErrs(payIds);
-        var ok = true;
-        var balance = calc(p).balance;
-        var amount = parseFloat($('ppAmount').value);
-        var date = $('ppDate').value;
-
-        if (isNaN(amount) || amount <= 0) {
-            setErr('ppAmount', 'Enter an amount greater than 0');
-            ok = false;
-        } else if (amount > balance) {
-            setErr('ppAmount', 'Amount cannot be more than the balance (' + money(balance) + ')');
-            ok = false;
-        }
-
-        if (!date) {
-            setErr('ppDate', 'Choose the payment date');
-            ok = false;
-        } else if (date > todayStr()) {
-            setErr('ppDate', 'Date cannot be in the future');
-            ok = false;
-        }
-
-        if (!ok) { return; }
-
-        amount = round2(amount);
-
-        api('POST', '/purchases/' + p.id + '/pay', {
-            amount: amount,
-            date: date,
-            method: $('ppMethod').value
-        })
-            .then(function () {
-                closeModal('puPayModal');
-                toast('Payment of ' + money(amount) + ' recorded for ' + p.no);
-                loadPurchases();
-            })
-            .catch(function (e) { toast(e.message || 'Could not record payment', 'err'); });
-    });
-
+       function togglePpMethod() {
+           var cash = AccountPicker.isCash($('ppAccount'));
+           $('ppMethodBox').style.display = cash ? 'none' : '';
+           $('ppRefBox').style.display = cash ? 'none' : '';
+       }
+   
+       function openPay(p) {
+           payingId = p.id;
+           clearErrs(payIds);
+   
+           $('ppSummary').innerHTML = '<div class="vd-pay-name">' + esc(p.no) + ' - ' + esc(p.vendor) + '</div>' +
+               '<div class="vd-pay-bal">Balance to pay: <b>' + money(calc(p).balance) + '</b></div>';
+   
+           $('ppAmount').value = '';
+           $('ppDate').value = todayStr();
+           $('ppMethod').value = 'Bank Transfer';
+           $('ppRef').value = '';
+   
+           openModal('puPayModal');
+           setTimeout(function () { $('ppAmount').focus(); }, 60);
+   
+           AccountPicker.load().then(function (list) {
+               AccountPicker.fill($('ppAccount'), list);
+               togglePpMethod();
+           });
+       }
+   
+       $('ppAccount').addEventListener('change', togglePpMethod);
+   
+       $('ppFull').addEventListener('click', function () {
+           var p = find(payingId);
+           if (p) { $('ppAmount').value = calc(p).balance; }
+       });
+   
+       $('ppSave').addEventListener('click', function () {
+           var p = find(payingId);
+           if (!p) { return; }
+   
+           clearErrs(payIds);
+           var ok = true;
+           var balance = calc(p).balance;
+           var amount = parseFloat($('ppAmount').value);
+           var date = $('ppDate').value;
+           var accountId = $('ppAccount').value;
+   
+           if (isNaN(amount) || amount <= 0) {
+               setErr('ppAmount', 'Enter an amount greater than 0');
+               ok = false;
+           } else if (amount > balance) {
+               setErr('ppAmount', 'Amount cannot be more than the balance (' + money(balance) + ')');
+               ok = false;
+           }
+   
+           if (!date) {
+               setErr('ppDate', 'Choose the payment date');
+               ok = false;
+           } else if (date > todayStr()) {
+               setErr('ppDate', 'Date cannot be in the future');
+               ok = false;
+           }
+   
+           if (!accountId) {
+               setErr('ppAccount', 'Choose the account the money is paid from');
+               ok = false;
+           }
+   
+           if (!ok) { return; }
+   
+           amount = round2(amount);
+   
+           api('POST', '/purchases/' + p.id + '/pay', {
+               amount: amount,
+               date: date,
+               account_id: Number(accountId),
+               method: AccountPicker.isCash($('ppAccount')) ? 'Cash' : $('ppMethod').value,
+               reference: $('ppRef').value.trim()
+           })
+               .then(function () {
+                   closeModal('puPayModal');
+                   toast('Payment of ' + money(amount) + ' recorded for ' + p.no);
+                   loadPurchases();
+               })
+               .catch(function (e) { toast(e.message || 'Could not record payment', 'err'); });
+       });
     // ---------- Delete ----------
     function askDelete(p) {
         deleteId = p.id;
@@ -706,19 +744,44 @@
         render();
     });
 
-    $('puChips').addEventListener('click', function (e) {
-        var chip = e.target.closest('.vd-chip');
-        if (!chip) { return; }
+    var sortPicker = SelectPicker.create({
+        options: [
+            { value: 'new', label: 'Sort: Newest first', icon: 'fa-regular fa-clock' },
+            { value: 'amount', label: 'Sort: Highest amount', icon: 'fa-solid fa-arrow-down-wide-short' }
+        ],
+        value: 'new',
+        onChange: function (v) {
+            state.sort = v;
+            render();
+        }
+    });
+    $('puSortBox').appendChild(sortPicker.el);
 
-        document.querySelectorAll('#puChips .vd-chip').forEach(function (c) { c.classList.remove('active'); });
-        chip.classList.add('active');
-        state.filter = chip.getAttribute('data-filter');
-        render();
+    // ---------- Date box aur Status box ----------
+    dateFilter = DateFilter.create({
+        mount: $('puDate'),
+        noun: 'purchases',
+        onChange: function () {
+            render();
+            DateFilter.animateRows($('puRows'));
+        }
     });
 
-    $('puSort').addEventListener('change', function () {
-        state.sort = this.value;
-        render();
+    statusBox = FilterSelect.create({
+        mount: $('puStatus'),
+        allLabel: 'All status',
+        options: [
+            { value: 'all', label: 'All' },
+            { value: 'Unpaid', label: 'Unpaid' },
+            { value: 'Partial', label: 'Partial' },
+            { value: 'Paid', label: 'Paid' },
+            { value: 'overdue', label: 'Overdue' }
+        ],
+        onChange: function (v) {
+            state.filter = v;
+            render();
+            DateFilter.animateRows($('puRows'));
+        }
     });
 
     // ---------- Page khulte hi data mangwana ----------

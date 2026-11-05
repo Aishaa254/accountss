@@ -717,16 +717,34 @@
     var side = $('ivSide');
     var overlay = $('ivOverlay');
 
-    function moveHtml(m) {
-        var labels = { in: 'Purchase', out: 'Sale', adj: 'Adjustment' };
+    var MV_LABEL = { open: 'Opening stock', 'in': 'Purchase', out: 'Sale', adj: 'Adjustment' };
+
+    function moveHtml(m, unit) {
+        var isIn = m.qty > 0;
         var sub = fmtDate(m.date) + (m.party ? ' - ' + m.party : '') + (m.note ? ' - ' + m.note : '');
+        var ref = m.type === 'open' ? '' : ' - ' + m.ref;
+        var label = (m.type === 'adj' && m.ref) ? 'Adjustment - ' + m.ref : MV_LABEL[m.type] + ref;
 
         return '<div class="vd-item">' +
-            '<div><div class="vd-item-main">' + labels[m.type] + ' - ' + esc(m.ref) + '</div>' +
+            '<div><div class="vd-item-main"><span class="iv-tag ' + (isIn ? 'in' : 'out') + '">' + (isIn ? 'IN' : 'OUT') + '</span>' + esc(label) + '</div>' +
             '<div class="vd-item-sub">' + esc(sub) + '</div></div>' +
-            '<div class="vd-item-right"><div class="vd-item-main ' + (m.qty > 0 ? 'vd-green' : 'vd-red') + '">' +
-            (m.qty > 0 ? '+' : '') + num(m.qty) + '</div></div>' +
+            '<div class="vd-item-right"><div class="vd-item-main ' + (isIn ? 'vd-green' : 'vd-red') + '">' +
+            (isIn ? '+' : '') + num(m.qty) + '</div>' +
+            '<div class="vd-item-sub">Balance ' + num(m.balance) + ' ' + esc(unit) + '</div></div>' +
         '</div>';
+    }
+
+    // filter: all, in ya out
+    function historyHtml(p, filter) {
+        var list = p.movements.filter(function (m) {
+            return filter === 'in' ? m.qty > 0 : (filter === 'out' ? m.qty < 0 : true);
+        });
+
+        if (!list.length) {
+            return '<div class="vd-none">' + (p.movements.length ? 'Nothing in this filter' : 'No movement yet') + '</div>';
+        }
+
+        return list.map(function (m) { return moveHtml(m, p.unit); }).join('');
     }
 
     function panelHtml(p) {
@@ -764,7 +782,17 @@
             (p.notes ? '<h4 class="vd-sec">Notes</h4><div class="vd-info"><div class="vd-info-row"><b>' + esc(p.notes) + '</b></div></div>' : '') +
 
             '<h4 class="vd-sec">Stock History</h4>' +
-            '<div class="vd-list">' + (p.movements.length ? p.movements.map(moveHtml).join('') : '<div class="vd-none">No movement yet</div>') + '</div>';
+            '<div class="iv-mv-sum">' +
+                '<div class="in"><span>Total in</span><b>+' + num(p.totalIn) + '</b></div>' +
+                '<div class="out"><span>Total out</span><b>-' + num(p.totalOut) + '</b></div>' +
+                '<div><span>In stock</span><b>' + num(p.stock) + ' ' + esc(p.unit) + '</b></div>' +
+            '</div>' +
+            '<div class="iv-mvf" id="ivMvf">' +
+                '<button type="button" class="on" data-f="all">All</button>' +
+                '<button type="button" data-f="in">In</button>' +
+                '<button type="button" data-f="out">Out</button>' +
+            '</div>' +
+            '<div class="vd-list iv-mv-list" id="ivMvList">' + historyHtml(p, 'all') + '</div>';
     }
 
     function openDetail(p) {
@@ -782,6 +810,15 @@
         overlay.classList.remove('open');
         side.setAttribute('aria-hidden', 'true');
     }
+
+    // In / Out filter buttons of the stock history
+    $('ivSideBody').addEventListener('click', function (e) {
+        var btn = e.target.closest('#ivMvf button');
+        if (!btn || !current) { return; }
+
+        Array.prototype.forEach.call($('ivMvf').children, function (b) { b.classList.toggle('on', b === btn); });
+        $('ivMvList').innerHTML = historyHtml(current, btn.getAttribute('data-f'));
+    });
 
     $('ivClose').addEventListener('click', closeDetail);
     overlay.addEventListener('click', closeDetail);
@@ -874,6 +911,129 @@
         input.value = '';
     });
 
+    // ---------- Unit selector (list with search; a new unit can be written too) ----------
+    var UNITS = ['pcs', 'kg', 'g', 'ton', 'meter', 'feet', 'inch', 'box', 'bag', 'dozen', 'liter', 'pack', 'set', 'roll', 'pair', 'sheet'];
+
+    var unitPanel = document.createElement('div');
+    unitPanel.className = 'pp-panel';
+    unitPanel.innerHTML =
+        '<div class="pp-search"><i class="fa-solid fa-magnifying-glass"></i>' +
+        '<input type="text" placeholder="Search or write a new unit" autocomplete="off" maxlength="20"></div>' +
+        '<div class="pp-list"></div>';
+    document.body.appendChild(unitPanel);
+
+    var unitSearch = unitPanel.querySelector('input');
+    var unitList = unitPanel.querySelector('.pp-list');
+
+    function allUnits() {
+        var list = UNITS.slice();
+        products.forEach(function (p) {
+            if (p.unit && list.indexOf(p.unit) === -1) { list.push(p.unit); }
+        });
+        return list;
+    }
+
+    function setUnit(value) {
+        var v = (value || 'pcs').trim() || 'pcs';
+        $('fiUnit').value = v;
+        $('fiUnitText').textContent = v;
+    }
+
+    function renderUnits() {
+        var q = unitSearch.value.trim();
+        var ql = q.toLowerCase();
+        var current = $('fiUnit').value;
+        var all = allUnits();
+
+        var html = all.filter(function (u) {
+            return !ql || u.toLowerCase().indexOf(ql) !== -1;
+        }).map(function (u) {
+            return '<div class="pp-item' + (u === current ? ' sel' : '') + '" data-unit="' + esc(u) + '">' +
+                '<span class="pp-info"><b>' + esc(u) + '</b></span></div>';
+        }).join('');
+
+        // Not in the list? Offer to use what was typed
+        if (q && all.map(function (u) { return u.toLowerCase(); }).indexOf(ql) === -1) {
+            html += '<div class="pp-item" data-unit="' + esc(q) + '">' +
+                '<span class="pp-av"><i class="fa-solid fa-plus"></i></span>' +
+                '<span class="pp-info"><b>Use "' + esc(q) + '"</b><small>New unit</small></span></div>';
+        }
+
+        unitList.innerHTML = html;
+    }
+
+    function closeUnits() {
+        unitPanel.classList.remove('open');
+        $('fiUnitBtn').classList.remove('open');
+    }
+
+    function openUnits() {
+        if (unitPanel.classList.contains('open')) { closeUnits(); return; }
+
+        var btn = $('fiUnitBtn');
+        var r = btn.getBoundingClientRect();
+        var w = Math.max(r.width, 230);
+
+        unitSearch.value = '';
+        renderUnits();
+
+        unitPanel.style.width = w + 'px';
+        unitPanel.style.left = Math.min(Math.max(10, r.left), window.innerWidth - w - 10) + 'px';
+
+        if (window.innerHeight - r.bottom < 330 && r.top > window.innerHeight - r.bottom) {
+            unitPanel.style.top = 'auto';
+            unitPanel.style.bottom = (window.innerHeight - r.top + 6) + 'px';
+            unitPanel.classList.add('up');
+        } else {
+            unitPanel.style.bottom = 'auto';
+            unitPanel.style.top = (r.bottom + 6) + 'px';
+            unitPanel.classList.remove('up');
+        }
+
+        unitPanel.classList.add('fresh');
+        unitPanel.classList.add('open');
+        btn.classList.add('open');
+        setTimeout(function () { unitPanel.classList.remove('fresh'); }, 450);
+        setTimeout(function () { unitSearch.focus(); }, 30);
+    }
+
+    function pickUnit(value) {
+        setUnit(value);
+        closeUnits();
+        $('fiUnitBtn').focus();
+    }
+
+    $('fiUnitBtn').addEventListener('click', openUnits);
+    unitSearch.addEventListener('input', renderUnits);
+
+    unitSearch.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            e.stopPropagation();
+            closeUnits();
+        } else if (e.key === 'Enter') {
+            e.preventDefault();
+            var first = unitList.querySelector('.pp-item');
+            if (first) { pickUnit(first.getAttribute('data-unit')); }
+        }
+    });
+
+    unitList.addEventListener('mousedown', function (e) { e.preventDefault(); });
+    unitList.addEventListener('click', function (e) {
+        var row = e.target.closest('.pp-item');
+        if (row) { pickUnit(row.getAttribute('data-unit')); }
+    });
+
+    document.addEventListener('mousedown', function (e) {
+        if (!unitPanel.classList.contains('open')) { return; }
+        if (unitPanel.contains(e.target) || $('fiUnitBtn').contains(e.target)) { return; }
+        closeUnits();
+    });
+    window.addEventListener('resize', closeUnits);
+    window.addEventListener('scroll', function (e) {
+        if (unitPanel.classList.contains('open') && !unitPanel.contains(e.target)) { closeUnits(); }
+    }, true);
+
     // More details (opens and closes)
     $('ivMoreToggle').addEventListener('click', function () {
         var box = $('ivMore');
@@ -893,7 +1053,7 @@
         $('fiName').value = p ? p.name : '';
         $('fiSku').value = p ? p.sku : '';
         $('fiCategory').value = p ? p.category : '';
-        $('fiUnit').value = p ? p.unit : 'pcs';
+        setUnit(p ? p.unit : 'pcs');
         $('fiCost').value = p ? p.cost : '';
         $('fiSale').value = p ? p.sale : '';
         $('fiReorder').value = p ? p.reorder : '';

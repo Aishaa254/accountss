@@ -73,10 +73,13 @@ var customersList = [];
 var productsList = [];
 
 var currentFilter = 'all';
+var dateFilter = null;   // date / month ka box (shared/date-filter.js)
+var statusBox = null;    // Paid / Unpaid wala box
 var viewNo = null;
 var payNo = null;
 var delNo = null;
 var menuNo = null;
+var customerPicker = null;
 
 function loadInvoices() {
     return api('GET', '/invoices/list').then(function (data) {
@@ -186,12 +189,28 @@ function billInner(inv) {
         sum += '<div class="due"><span>Balance Due</span><span>' + money(t.balance) + '</span></div>';
     }
 
+    // Payments: kis account mein aaya, aur kis ne likha
+    var payRows = '';
+    (inv.payments || []).forEach(function (p) {
+        var how = p.reference ? 'Ref ' + p.reference : '';
+        payRows += '<tr><td>' + esc(p.date) + '</td>' +
+            '<td>' + esc(p.account || '-') + (how ? '<div class="bill-small">' + esc(how) + '</div>' : '') + '</td>' +
+            '<td>' + esc(p.by || '-') + '</td>' +
+            '<td class="r">' + money(p.amount) + '</td></tr>';
+    });
+
+    var payBlock = payRows
+        ? '<div class="bill-small" style="margin:14px 0 6px;font-weight:600;">Payments received</div>' +
+        '<table class="bill-table"><thead><tr><th>Date</th><th>Received in</th><th>By</th><th class="r">Amount</th></tr></thead><tbody>' + payRows + '</tbody></table>'
+        : '';
+
     return '<div class="bill-top">' +
-            '<div><div class="bill-co">' + esc(COMPANY.name) + '</div><div class="bill-small">' + esc(COMPANY.address) + '<br>' + esc(COMPANY.phone) + '</div></div>' +
-            '<div class="bill-right"><div class="bill-title">INVOICE</div><div class="bill-small">No: ' + esc(inv.no) + '<br>Date: ' + esc(inv.date) + '<br>Due: ' + esc(inv.due) + '</div></div>' +
+        '<div><div class="bill-co">' + esc(COMPANY.name) + '</div><div class="bill-small">' + esc(COMPANY.address) + '<br>' + esc(COMPANY.phone) + '</div></div>' +
+        '<div class="bill-right"><div class="bill-title">INVOICE</div><div class="bill-small">No: ' + esc(inv.no) + '<br>Date: ' + esc(inv.date) + '<br>Due: ' + esc(inv.due) + '</div></div>' +
         '</div>' +
         '<div class="bill-to"><span>Bill To</span><b>' + esc(inv.customer) + '</b></div>' +
         '<table class="bill-table"><thead><tr><th>Item</th><th class="r">Qty</th><th class="r">Price</th><th class="r">Total</th></tr></thead><tbody>' + rows + '</tbody></table>' +
+        payBlock +
         '<div class="bill-sum">' + sum + '</div>' +
         '<div class="bill-foot">Thank you for your business.</div>';
 }
@@ -257,12 +276,25 @@ function matchesFilter(inv) {
     return true;
 }
 
+function inDateRange(inv) {
+    return dateFilter ? dateFilter.match(inv.date) : true;
+}
+
+// Status ke numbers ab sirf chune hue date range ke invoices ginte hain
 function renderTabs() {
-    $('cnt-all').textContent = invoices.length;
-    $('cnt-unpaid').textContent = invoices.filter(function (i) { return statusOf(i) === 'Unpaid'; }).length;
-    $('cnt-partial').textContent = invoices.filter(function (i) { return statusOf(i) === 'Partial'; }).length;
-    $('cnt-paid').textContent = invoices.filter(function (i) { return statusOf(i) === 'Paid'; }).length;
-    $('cnt-overdue').textContent = invoices.filter(isOverdue).length;
+    var list = invoices.filter(inDateRange);
+
+    if (statusBox) {
+        statusBox.setCounts({
+            all: list.length,
+            unpaid: list.filter(function (i) { return statusOf(i) === 'Unpaid'; }).length,
+            partial: list.filter(function (i) { return statusOf(i) === 'Partial'; }).length,
+            paid: list.filter(function (i) { return statusOf(i) === 'Paid'; }).length,
+            overdue: list.filter(isOverdue).length
+        });
+    }
+
+    if (dateFilter) { dateFilter.setCount(list.length, invoices.length); }
 }
 
 function renderTable() {
@@ -270,6 +302,7 @@ function renderTable() {
     var html = '';
 
     invoices.filter(function (inv) {
+        if (!inDateRange(inv)) return false;
         if (!matchesFilter(inv)) return false;
         if (q && (inv.no + ' ' + inv.customer).toLowerCase().indexOf(q) === -1) return false;
         return true;
@@ -280,16 +313,16 @@ function renderTable() {
         var badge = s === 'Paid' ? 'b-green' : (s === 'Partial' ? 'b-amber' : 'b-red');
 
         html += '<tr data-no="' + inv.no + '">' +
+            '<td>' + esc(inv.date) + '</td>' +
             '<td><b>' + esc(inv.no) + '</b></td>' +
             '<td>' + esc(inv.customer) + '</td>' +
-            '<td>' + esc(inv.date) + '</td>' +
             '<td>' + esc(inv.due) + dueTag(inv) + '</td>' +
             '<td><b>' + money(t.total) + '</b></td>' +
             '<td><div class="limit-bar"><div class="limit-fill f-ok" style="width:' + pct + '%"></div></div>' +
-                '<div class="paid-text">' + money(inv.paid) + ' paid</div></td>' +
+            '<div class="paid-text">' + money(inv.paid) + ' paid</div></td>' +
             '<td><span class="badge ' + badge + '">' + s + '</span></td>' +
             '<td><div class="acts">' +
-                '<button class="act" data-act="menu" title="Quick actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>' +
+            '<button class="act" data-act="menu" title="Quick actions"><i class="fa-solid fa-ellipsis-vertical"></i></button>' +
             '</div></td></tr>';
     });
 
@@ -373,6 +406,10 @@ function openView(no) {
 }
 
 // ---------- Record payment ----------
+function togglePayMethod() {
+    $('pay-ref-box').style.display = AccountPicker.isCash($('pay-account')) ? 'none' : '';
+}
+
 function openPay(no) {
     var inv = findInv(no);
     var t = totals(inv);
@@ -380,9 +417,15 @@ function openPay(no) {
     $('pay-info').textContent = inv.no + ' - ' + inv.customer + ' | Balance: ' + money(t.balance);
     $('pay-amount').value = Math.round(t.balance);
     $('pay-date').value = iso(0);
+    $('pay-ref').value = '';
     $('pay-error').textContent = '';
     $('pay-modal').classList.add('show');
     $('pay-amount').focus();
+
+    AccountPicker.load().then(function (list) {
+        AccountPicker.fill($('pay-account'), list);
+        togglePayMethod();
+    });
 }
 
 function savePay() {
@@ -390,14 +433,22 @@ function savePay() {
     var t = totals(inv);
     var amount = parseFloat($('pay-amount').value) || 0;
     var date = $('pay-date').value;
+    var accountId = $('pay-account').value;
 
     if (amount <= 0) { $('pay-error').textContent = 'Enter Amount.'; return; }
     if (amount > Math.round(t.balance)) { $('pay-error').textContent = 'Can not be more than balance.'; return; }
     if (!date) { $('pay-error').textContent = 'Choose the payment date.'; return; }
     if (date > iso(0)) { $('pay-error').textContent = 'Date cannot be in the future.'; return; }
     if (date < inv.date) { $('pay-error').textContent = 'Date cannot be before the invoice date (' + inv.date + ').'; return; }
+    if (!accountId) { $('pay-error').textContent = 'Choose where the money was received.'; return; }
 
-    api('POST', '/invoices/' + encodeURIComponent(payNo) + '/pay', { amount: amount, date: date })
+
+    api('POST', '/invoices/' + encodeURIComponent(payNo) + '/pay', {
+        amount: amount,
+        date: date,
+        account_id: Number(accountId),
+        reference: $('pay-ref').value.trim()
+    })
         .then(function () {
             $('pay-modal').classList.remove('show');
             toast('Payment is saved');
@@ -439,8 +490,10 @@ function addItemRow() {
     var row = document.createElement('div');
     row.className = 'item-row';
     row.innerHTML = '<div class="it-pick"></div>' +
+        '<div class="qty-box"><button type="button" class="q-minus"><i class="fa-solid fa-minus"></i></button>' +
         '<input class="it-qty" type="number" value="1" min="1">' +
-        '<input class="it-price" type="number" placeholder="Price">' +
+        '<button type="button" class="q-plus"><i class="fa-solid fa-plus"></i></button></div>' +
+        '<input class="it-price" type="number" placeholder="Price" min="0">' +
         '<button type="button" class="it-del"><i class="fa-solid fa-xmark"></i></button>' +
         '<input class="it-desc" type="text" placeholder="Description (optional)" maxlength="200">' +
         '<small class="it-stock"></small>';
@@ -475,8 +528,9 @@ function readItems() {
 }
 
 function selectedCustomerName() {
-    var sel = $('n-customer');
-    return sel.value ? sel.options[sel.selectedIndex].text : '-';
+    var id = customerPicker.get();
+    var c = customersList.filter(function (x) { return x.id === Number(id); })[0];
+    return c ? c.name : '-';
 }
 
 function draft() {
@@ -497,9 +551,8 @@ function updatePreview() { $('new-bill').innerHTML = billInner(draft()); }
 var newErrIds = ['n-customer', 'n-due', 'items', 'n-discount', 'n-tax'];
 
 function openNew() {
-    var opts = '<option value="">Select customer</option>';
-    customersList.forEach(function (c) { opts += '<option value="' + c.id + '">' + esc(c.name) + '</option>'; });
-    $('n-customer').innerHTML = opts;
+
+    customerPicker.clear();
     $('n-due').value = iso(15);
     $('n-discount').value = 0;
     $('n-tax').value = 0;
@@ -520,7 +573,7 @@ function validateNew() {
     var ok = true;
 
     // Customer
-    if (!$('n-customer').value) { setErr('n-customer', 'Select a customer'); ok = false; }
+    if (!customerPicker.get()) { setErr('n-customer', 'Select a customer'); ok = false; }
 
     // Due date
     var due = $('n-due').value;
@@ -595,7 +648,7 @@ function saveNew() {
     $('new-save').disabled = true;
 
     api('POST', '/invoices', {
-        customer_id: $('n-customer').value,
+        customer_id: customerPicker.get(),
         due: v.due,
         discount: v.discount,
         tax: v.tax,
@@ -612,6 +665,12 @@ function saveNew() {
 }
 
 // ---------- Buttons and clicks ----------
+customerPicker = CustomerPicker.create({
+    customers: function () { return customersList; },
+    onSelect: function () { setErr('n-customer', ''); updatePreview(); }
+});
+customerPicker.el.id = 'n-customer';
+$('n-customer-box').appendChild(customerPicker.el);
 $('open-new').addEventListener('click', openNew);
 $('add-item').addEventListener('click', function () { addItemRow(); updatePreview(); });
 
@@ -630,6 +689,13 @@ function onFormEdit(e) {
 $('new-form').addEventListener('input', onFormEdit);
 $('new-form').addEventListener('change', onFormEdit);
 $('new-form').addEventListener('click', function (e) {
+    var stepBtn = e.target.closest('.q-minus, .q-plus');
+    if (stepBtn) {
+        var input = stepBtn.closest('.qty-box').querySelector('input');
+        if (stepBtn.classList.contains('q-plus')) { input.stepUp(); } else { input.stepDown(); }
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        return;
+    }
     if (e.target.closest('.it-del')) {
         var rows = document.querySelectorAll('#items .item-row');
         if (rows.length > 1) { e.target.closest('.item-row').remove(); updatePreview(); }
@@ -645,6 +711,7 @@ $('view-dl').addEventListener('click', function () { downloadBill(findInv(viewNo
 $('view-pay').addEventListener('click', function () { openPay(viewNo); });
 
 $('pay-save').addEventListener('click', savePay);
+$('pay-account').addEventListener('change', togglePayMethod);
 $('pay-close').addEventListener('click', function () { $('pay-modal').classList.remove('show'); });
 $('pay-cancel').addEventListener('click', function () { $('pay-modal').classList.remove('show'); });
 
@@ -687,9 +754,43 @@ document.addEventListener('keydown', function (e) {
     }
 });
 
+// ---------- Date box aur Status box ----------
+dateFilter = DateFilter.create({
+    mount: $('date-filter'),
+    noun: 'invoices',
+    onChange: function () {
+        renderTabs();
+        renderTable();
+        DateFilter.animateRows($('inv-body'));
+    }
+});
+
+statusBox = FilterSelect.create({
+    mount: $('status-filter'),
+    allLabel: 'All status',
+    options: [
+        { value: 'all', label: 'All' },
+        { value: 'unpaid', label: 'Unpaid' },
+        { value: 'partial', label: 'Partial' },
+        { value: 'paid', label: 'Paid' },
+        { value: 'overdue', label: 'Overdue' }
+    ],
+    onChange: function (v) {
+        currentFilter = v;
+        renderTable();
+        DateFilter.animateRows($('inv-body'));
+    }
+});
+
 // ---------- Load the data when the page opens ----------
 loadCustomers();
-loadInvoices();
+loadInvoices().then(function () {
+    var wanted = new URLSearchParams(window.location.search).get('open');
+    if (wanted && findInv(wanted)) {
+        openView(wanted);
+        window.history.replaceState(null, '', '/invoices');
+    }
+});
 loadCompany();
 loadProducts();
 
@@ -700,7 +801,7 @@ loadProducts();
 
     loadCustomers().then(function () {
         openNew();
-        $('n-customer').value = wanted;
+        customerPicker.set(wanted);
         updatePreview();
         window.history.replaceState(null, '', '/invoices');
     });

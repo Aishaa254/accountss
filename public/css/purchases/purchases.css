@@ -154,3 +154,5 @@
     .pu-item-row .pu-desc { grid-column: 1 / -1; }
     .pu-line-total { text-align: left; }
 }
+.pp.vd-invalid { border-color: #e11d48; box-shadow: 0 0 0 2px rgba(225, 29, 72, 0.15); }
+#puSortBox { min-width: 220px; }

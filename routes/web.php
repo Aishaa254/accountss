@@ -14,6 +14,8 @@ use App\Http\Controllers\InventoryController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\AuditLogController;
+use App\Http\Controllers\AdvisorController;
+use App\Http\Controllers\AccountController;
 
 /*
 |--------------------------------------------------------------------------
@@ -40,6 +42,7 @@ Route::middleware('auth')->group(function () {
     Route::get('/company/info', [CompanySettingController::class, 'info']);
     Route::get('/inventory/summary', [InventoryController::class, 'summary']);
     Route::get('/inventory/options', [InventoryController::class, 'options']);
+    Route::get('/accounts/options', [AccountController::class, 'options']);
 
     // ---------- Dashboard ----------
     Route::middleware('can.module:dashboard')->group(function () {
@@ -103,12 +106,39 @@ Route::middleware('auth')->group(function () {
         Route::delete('/expenses/{expense}', [ExpenseController::class, 'destroy']);
     });
 
+        // ---------- Cash and Bank ----------
+        Route::middleware('can.module:accounts')->group(function () {
+            Route::get('/cash', function () {
+                return view('pages.cash.cash');
+            });
+            Route::get('/cash/data', [AccountController::class, 'cash']);
+            Route::put('/cash/opening', [AccountController::class, 'cashOpening']);
+            Route::post('/cash/adjust', [AccountController::class, 'cashAdjust']);
+    
+            Route::get('/banks', function () {
+                return view('pages.banks.banks');
+            });
+            Route::get('/banks/list', [AccountController::class, 'banks']);
+            Route::post('/banks', [AccountController::class, 'storeBank']);
+            Route::put('/banks/{account}', [AccountController::class, 'updateBank']);
+            Route::get('/banks/{account}/data', [AccountController::class, 'bankData']);
+    
+            Route::post('/accounts/{account}/entry', [AccountController::class, 'entry']);
+            Route::delete('/account-entries/{entry}', [AccountController::class, 'destroyEntry']);
+        });
+
     // ---------- Reports ----------
     Route::middleware('can.module:reports')->group(function () {
         Route::get('/reports', function () {
             return view('pages.reports.reports');
         });
         Route::get('/reports/data', [ReportController::class, 'data']);
+
+        // Business Advisor (Reports wali permission hi use hoti hai)
+        Route::get('/advisor', function () {
+            return view('pages.advisor.advisor');
+        });
+        Route::get('/advisor/data', [AdvisorController::class, 'data']);
     });
 
     // ---------- Inventory ----------

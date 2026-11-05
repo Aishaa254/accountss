@@ -262,7 +262,8 @@
 
                     <div class="vd-field">
                         <label>Unit</label>
-                        <input type="text" class="vd-input" id="fiUnit" list="ivUnits" maxlength="20" placeholder="pcs">
+                        <button type="button" class="ut-btn" id="fiUnitBtn"><span id="fiUnitText">pcs</span><i class="fa-solid fa-chevron-down"></i></button>
+                        <input type="hidden" id="fiUnit" value="pcs">
                     </div>
 
                     <div class="vd-field">
@@ -271,14 +272,7 @@
                         <small class="vd-hint" id="fiMargin"></small>
                         <small class="vd-err" data-err="fiSale"></small>
                     </div>
-                </div>
-            </div>
 
-            <!-- More details (hidden until opened) -->
-            <button type="button" class="iv-more-toggle" id="ivMoreToggle"><i class="fa-solid fa-chevron-down"></i> More details</button>
-
-            <div class="iv-more" id="ivMore" style="display:none">
-                <div class="vd-grid">
                     <div class="vd-field">
                         <label>Code (SKU)</label>
                         <input type="text" class="vd-input" id="fiSku" maxlength="40" placeholder="Made automatically, e.g. PRD-0001">
@@ -289,7 +283,14 @@
                         <label>Category</label>
                         <input type="text" class="vd-input" id="fiCategory" list="ivCategories" maxlength="40" placeholder="General">
                     </div>
+                </div>
+            </div>
 
+            <!-- More details (hidden until opened) -->
+            <button type="button" class="iv-more-toggle" id="ivMoreToggle"><i class="fa-solid fa-chevron-down"></i> More details</button>
+
+            <div class="iv-more" id="ivMore" style="display:none">
+                <div class="vd-grid">
                     <div class="vd-field">
                         <label>Cost Price (<span class="cur-sym">Rs</span>)</label>
                         <input type="number" class="vd-input" id="fiCost" min="0" step="any" placeholder="0">
@@ -320,11 +321,6 @@
             </div>
 
             <datalist id="ivCategories"></datalist>
-            <datalist id="ivUnits">
-                <option value="pcs"><option value="kg"><option value="g"><option value="meter">
-                <option value="box"><option value="dozen"><option value="liter"><option value="pack">
-                <option value="set"><option value="roll">
-            </datalist>
         </div>
 
         <div class="vd-modal-foot">

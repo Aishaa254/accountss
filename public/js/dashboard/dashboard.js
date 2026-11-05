@@ -24,7 +24,7 @@
         var sales = data.sales;
         var purchases = data.purchases;
         var expenses = data.expenses;
-        var profit = sales.map(function (s, i) { return s - purchases[i] - expenses[i]; });
+        var profit = data.profit;
 
         var receivable = data.receivable;
         var payable = data.payable;
@@ -100,7 +100,7 @@
 
         // ---------- Chart ----------
         var maxValue = 0;
-        var spending = purchases.map(function (p, i) { return p + expenses[i]; });
+        var spending = data.cogs.map(function (c, i) { return c + expenses[i]; });
         sales.concat(spending).forEach(function (v) { if (v > maxValue) { maxValue = v; } });
         maxValue = maxValue || 1;
 

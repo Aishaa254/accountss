@@ -133,3 +133,17 @@
     .iv-form-top { grid-template-columns: 1fr; }
     .iv-pic-box { margin: 0 auto; }
 }
+
+/* ---------- Unit selector button (product form) ---------- */
+.ut-btn {
+    display: flex; align-items: center; justify-content: space-between; gap: 10px;
+    width: 100%; min-height: 42px; box-sizing: border-box; padding: 8px 12px;
+    border: 1px solid var(--border, #e2e8f0); border-radius: 10px;
+    background: var(--bg, #f8fafc); color: var(--text, #0f172a);
+    font-size: 14px; font-family: inherit; cursor: pointer;
+    transition: border-color .15s ease, box-shadow .15s ease;
+}
+.ut-btn:hover, .ut-btn:focus, .ut-btn.open { border-color: var(--main, #0f766e); outline: none; }
+.ut-btn.open { box-shadow: 0 0 0 3px rgba(20, 184, 166, 0.18); }
+.ut-btn i { color: var(--muted, #94a3b8); font-size: 12px; transition: transform .2s ease; }
+.ut-btn.open i { transform: rotate(180deg); }

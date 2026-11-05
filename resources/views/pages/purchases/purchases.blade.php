@@ -6,11 +6,18 @@
 <link rel="stylesheet" href="{{ asset('css/vendors/vendors.css') }}">
 <link rel="stylesheet" href="{{ asset('css/purchases/purchases.css') }}">
 <link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/date-filter.css') }}">
+
 @endpush
 
 @push('scripts')
 <script src="{{ asset('js/shared/product-picker.js') }}"></script>
+<script src="{{ asset('js/shared/date-filter.js') }}"></script>
+<script src="{{ asset('js/shared/select-picker.js') }}"></script>
+<script src="{{ asset('js/accounts/account-picker.js') }}"></script>
+<script src="{{ asset('js/shared/customer-picker.js') }}"></script>
 <script src="{{ asset('js/purchases/purchases.js') }}"></script>
+
 @endpush
 
 @section('content')
@@ -65,33 +72,27 @@
 <!-- ===== List ===== -->
 <div class="vd-panel">
 
-    <div class="vd-toolbar">
+    <div class="vd-toolbar fb-toolbar">
         <div class="vd-search">
             <i class="fa-solid fa-magnifying-glass"></i>
             <input type="text" id="puSearch" placeholder="Search by PO number or vendor">
         </div>
 
-        <div class="vd-chips" id="puChips">
-            <button type="button" class="vd-chip active" data-filter="all">All <span id="cAll">0</span></button>
-            <button type="button" class="vd-chip" data-filter="Unpaid">Unpaid <span id="cUnpaid">0</span></button>
-            <button type="button" class="vd-chip" data-filter="Partial">Partial <span id="cPartial">0</span></button>
-            <button type="button" class="vd-chip" data-filter="Paid">Paid <span id="cPaid">0</span></button>
-            <button type="button" class="vd-chip" data-filter="overdue">Overdue <span id="cOverdue">0</span></button>
-        </div>
+        <!-- Bare boxes pehle (Search, From - To), chhote Status aur Sort baad mein -->
+        <div id="puDate"></div>
+        <div id="puStatus"></div>
 
-        <select class="vd-sort" id="puSort">
-            <option value="new">Sort: Newest first</option>
-            <option value="amount">Sort: Highest amount</option>
-        </select>
+
+        <div id="puSortBox"></div>
     </div>
 
     <div class="vd-table-wrap">
         <table class="vd-table">
             <thead>
                 <tr>
+                    <th>Date</th>
                     <th>Purchase</th>
                     <th>Vendor</th>
-                    <th>Date</th>
                     <th>Due</th>
                     <th>Amount</th>
                     <th>Payment</th>
@@ -134,7 +135,7 @@
             <div class="vd-grid pu-grid3">
                 <div class="vd-field">
                     <label>Vendor <span class="vd-req">*</span></label>
-                    <select class="vd-input" id="pfVendor"></select>
+                    <div id="pfVendorBox"></div>
                     <small class="vd-err" data-err="pfVendor"></small>
                 </div>
 
@@ -203,13 +204,26 @@
             </div>
 
             <div class="vd-field">
+                <label>Paid from <span class="vd-req">*</span></label>
+                <select class="vd-input" id="ppAccount"></select>
+                <small class="vd-err" data-err="ppAccount"></small>
+            </div>
+
+            <div style="display:none">
+            <div class="vd-field" id="ppMethodBox">
                 <label>Method</label>
                 <select class="vd-input" id="ppMethod">
-                    <option>Cash</option>
                     <option>Bank Transfer</option>
                     <option>Cheque</option>
                     <option>Online</option>
+                    <option>Cash</option>
                 </select>
+            </div>
+            </div>
+
+            <div class="vd-field" id="ppRefBox">
+                <label>Reference no.</label>
+                <input type="text" class="vd-input" id="ppRef" maxlength="60" placeholder="Optional">
             </div>
         </div>
 

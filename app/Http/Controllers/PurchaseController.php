@@ -8,6 +8,9 @@ use App\Models\Product;
 use App\Models\Purchase;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use App\Models\Account;
+use App\Services\AccountLedger;
+use Illuminate\Validation\Rule;
 
 class PurchaseController extends Controller
 {
@@ -154,24 +157,61 @@ class PurchaseController extends Controller
 
     public function destroy(Purchase $purchase)
     {
-        $purchase->delete();
+        DB::transaction(function () use ($purchase) {
+            // Payments ke saath unki account entries bhi hatti hain
+            foreach ($purchase->payments()->pluck('id') as $id) {
+                AccountLedger::forget('purchase_payment', $id);
+            }
+
+            $purchase->delete();
+        });
 
         return response()->json(['ok' => true]);
     }
 
     public function pay(Request $request, Purchase $purchase)
     {
-        $purchase->load(['items', 'payments']);
+        $purchase->load(['items', 'payments', 'vendor']);
         $balance = $purchase->balance();
 
         $data = $request->validate([
             'amount' => 'required|numeric|gt:0|lte:' . $balance,
             'date' => 'required|date|before_or_equal:today',
-            'method' => 'required|string|max:50',
+            'account_id' => ['required', Rule::exists('accounts', 'id')->where('active', true)],
+            'reference' => 'nullable|string|max:60',
+        ], [
+            'account_id.required' => 'Choose which account the money is paid from.',
+            'account_id.exists' => 'This account is not available.',
         ]);
 
-        $payment = $purchase->payments()->create($data);
-        $this->stamp($payment);
+        $account = Account::findOrFail($data['account_id']);
+        $method = $account->type === 'cash' ? 'Cash' : 'Bank';
+
+        DB::transaction(function () use ($purchase, $data, $account, $method) {
+            $payment = $purchase->payments()->create([
+                'amount' => $data['amount'],
+                'date' => $data['date'],
+                'method' => $method,
+                'account_id' => $account->id,
+                'reference' => $data['reference'] ?? null,
+            ]);
+
+            $this->stamp($payment);
+
+            // Account mein kam paisa ho to yahin ruk jata hai aur sab wapas ho jata hai
+            AccountLedger::post(
+                $account,
+                'out',
+                (float) $data['amount'],
+                $data['date'],
+                'payment_out',
+                'purchase_payment',
+                $payment->id,
+                $method,
+                $data['reference'] ?? null,
+                'Paid ' . $purchase->no . ' to ' . $purchase->vendor->name
+            );
+        });
 
         return response()->json(['ok' => true]);
     }
