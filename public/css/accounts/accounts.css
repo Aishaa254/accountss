@@ -106,3 +106,90 @@
 @media (prefers-reduced-motion: reduce) {
     .ac-hero, .ac-total, .ac-bank { animation: none; }
 }
+
+/* ===== Cash page: smart button menu, type badges, empty note ===== */
+.ac-btn-wide { min-width: 180px; padding-left: 28px; padding-right: 28px; justify-content: center; font-size: 15px; }
+.ac-menu { position: relative; }
+.ac-menu-list {
+    display: none; position: absolute; right: 0; top: calc(100% + 8px); min-width: 220px;
+    background: var(--card, #fff); border: 1px solid var(--border); border-radius: 12px;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.14); padding: 6px; z-index: 30;
+}
+.ac-menu.open .ac-menu-list { display: block; }
+.ac-menu-item {
+    display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; background: none; border: 0;
+    border-radius: 8px; color: var(--text); font: inherit; font-size: 14px; cursor: pointer; text-align: left;
+}
+.ac-menu-item:hover { background: var(--hover); }
+.ac-menu-item i { width: 16px; color: var(--main); }
+.ac-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; }
+.ac-badge-in { background: rgba(22, 163, 74, 0.12); color: #16a34a; }
+.ac-badge-out { background: rgba(239, 68, 68, 0.12); color: #ef4444; }
+.ac-empty-note { margin-top: 12px; font-size: 13px; color: var(--muted); }
+.ac-empty-note i { color: var(--main); margin-right: 6px; }
+
+/* ===== Cash page: on/off switch ===== */
+.ac-switch {
+    display: inline-flex; align-items: center; gap: 12px; margin-top: 16px; cursor: pointer; user-select: none;
+    padding: 9px 16px 9px 12px; border: 1.5px solid var(--border); border-radius: 999px; background: var(--card, #fff);
+}
+.ac-switch:hover { border-color: var(--main); }
+.ac-switch input { position: absolute; opacity: 0; pointer-events: none; }
+.ac-switch-track { position: relative; width: 44px; height: 24px; border-radius: 999px; background: #94a3b8; transition: background .2s; flex-shrink: 0; }
+.ac-switch-track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.35); transition: transform .2s; }
+.ac-switch input:checked + .ac-switch-track { background: #16a34a; }
+.ac-switch input:checked + .ac-switch-track::after { transform: translateX(20px); }
+.ac-switch input:focus-visible + .ac-switch-track { outline: 2px solid var(--main); outline-offset: 2px; }
+.ac-switch-text { font-size: 14px; font-weight: 600; color: var(--text); }
+.ac-switch-state { font-size: 12px; font-weight: 700; padding: 2px 9px; border-radius: 999px; background: rgba(148,163,184,.25); color: var(--text); }
+.ac-switch input:checked ~ .ac-switch-state { background: rgba(22,163,74,.15); color: #16a34a; }
+
+/* ===== Cash page: where money came from / went ===== */
+.ac-split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 14px 16px; border-bottom: 1px solid var(--border); }
+.ac-bd { background: var(--hover); border-radius: 14px; padding: 14px 16px; }
+.ac-bd-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 10px; }
+.ac-bd-head h4 { font-size: 14px; }
+.ac-bd-head b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.ac-bd-row { margin-bottom: 9px; }
+.ac-bd-row:last-child { margin-bottom: 0; }
+.ac-bd-line { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; margin-bottom: 4px; }
+.ac-bd-line span:first-child { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ac-bd-line span:last-child { color: var(--muted); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.ac-bd-bar { height: 7px; border-radius: 999px; background: var(--border); overflow: hidden; }
+.ac-bd-bar i { display: block; height: 100%; border-radius: 999px; transition: width .5s ease; }
+.ac-bd-in .ac-bd-bar i { background: #16a34a; }
+.ac-bd-out .ac-bd-bar i { background: #ef4444; }
+.ac-bd-empty { color: var(--muted); font-size: 13px; padding: 6px 0; }
+
+/* ===== Cash page: toolbar, row icons, pager ===== */
+.ac-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.ac-tabs { display: inline-flex; gap: 6px; background: var(--hover); padding: 4px; border-radius: 999px; }
+.ac-tabs button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 13px; font-weight: 600; padding: 6px 14px; border-radius: 999px; cursor: pointer; }
+.ac-tabs button.active { background: var(--card, #fff); color: var(--text); box-shadow: 0 1px 4px rgba(15,23,42,.12); }
+.ac-search { position: relative; }
+.ac-search i { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--muted); font-size: 13px; }
+.ac-search input { padding-left: 34px; min-width: 230px; }
+.ac-kind-cell { display: flex; align-items: center; gap: 12px; }
+.ac-kind { width: 36px; height: 36px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-size: 14px; flex-shrink: 0; }
+.ac-kind-in { background: rgba(22,163,74,.12); color: #16a34a; }
+.ac-kind-out { background: rgba(239,68,68,.12); color: #ef4444; }
+.ac-cat { display: inline-block; margin-left: 8px; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: var(--hover); color: var(--muted); vertical-align: middle; }
+.ac-pager { display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; padding: 12px 16px; color: var(--muted); font-size: 13px; }
+.ac-pager-ctl { display: flex; align-items: center; gap: 8px; }
+.ac-pager-ctl select {
+    width: auto; min-width: 112px; padding: 7px 36px 7px 14px; cursor: pointer; font-weight: 600;
+    -webkit-appearance: none; -moz-appearance: none; appearance: none;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 19px) 52%, calc(100% - 14px) 52%;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat: no-repeat;
+}
+.ac-pager-ctl select:focus { outline: none; border-color: var(--main); }
+.ac-pager-ctl select::selection { background: transparent; }
+.ac-pager-ctl button:disabled { opacity: .45; cursor: not-allowed; }
+
+@media (max-width: 760px) {
+    .ac-split { grid-template-columns: 1fr; }
+    .ac-search input { min-width: 0; width: 100%; }
+    .ac-search { flex: 1; }
+}

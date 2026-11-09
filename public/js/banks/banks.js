@@ -2,36 +2,37 @@
     var A = window.Acc;
     var $ = A.$;
 
+    var BANKS = [
+        'HBL', 'UBL', 'MCB', 'Allied Bank', 'Meezan Bank', 'Bank Alfalah', 'Askari Bank',
+        'Faysal Bank', 'Standard Chartered', 'Bank of Punjab', 'NBP', 'JS Bank',
+        'Soneri Bank', 'Habib Metro', 'Bank Al Habib', 'Other'
+    ];
+
     var banks = [];
-    var selectedId = null;
-    var detail = null;
     var editingId = null;
-    var dateFilter = null;
 
     function find(id) { return banks.filter(function (b) { return b.id === id; })[0]; }
 
-    function query() {
-        var r = dateFilter ? dateFilter.getRange() : {};
-        var q = [];
-        if (r.from) { q.push('from=' + r.from); }
-        if (r.to) { q.push('to=' + r.to); }
-        return q.length ? '?' + q.join('&') : '';
+    function holderOf(b) { return b.account_title || b.name; }
+
+    // Poora number agar hai, warna purane banks ke liye sirf akhri 4 digits
+    function numberOf(b) {
+        if (b.account_number) { return b.account_number; }
+        return b.last4 ? '••••' + b.last4 : '—';
     }
 
     // ---------- Bank cards ----------
     function cardHtml(b) {
-        var sub = A.esc(b.bank_name || '') + (b.last4 ? ' · ••••' + A.esc(b.last4) : '');
+        var sub = A.esc(holderOf(b)) + (b.last4 ? ' · ••••' + A.esc(b.last4) : '');
         var off = b.active ? '' : ' disabled';
 
-        return '<div class="ac-bank' + (b.id === selectedId ? ' selected' : '') + (b.active ? '' : ' inactive') + '" data-id="' + b.id + '">' +
+        return '<div class="ac-bank' + (b.active ? '' : ' inactive') + '" data-id="' + b.id + '">' +
             '<div class="ac-bank-top">' +
                 '<div class="ac-bank-ic"><i class="fa-solid fa-building-columns"></i></div>' +
-                '<div class="ac-bank-name"><b>' + A.esc(b.name) + (b.active ? '' : '<span class="ac-tag-off">Inactive</span>') + '</b><span>' + sub + '</span></div>' +
+                '<div class="ac-bank-name"><b>' + A.esc(b.bank_name || b.name) + (b.active ? '' : '<span class="ac-tag-off">Inactive</span>') + '</b><span>' + sub + '</span></div>' +
                 '<button type="button" class="vd-dots" data-act="edit" data-id="' + b.id + '" title="Edit"><i class="fa-regular fa-pen-to-square"></i></button>' +
             '</div>' +
             '<div class="ac-bank-bal" data-bal="' + b.balance + '">' + A.money(0) + '</div>' +
-            A.spark(b.spark) +
-            '<div class="ac-bank-foot"><span class="ac-in">In today ' + A.money(b.today_in) + '</span><span class="ac-out">Out today ' + A.money(b.today_out) + '</span></div>' +
             '<div class="ac-bank-actions">' +
                 '<button type="button" class="vd-btn-ghost" data-act="in" data-id="' + b.id + '"' + off + '><i class="fa-solid fa-plus"></i> Add</button>' +
                 '<button type="button" class="vd-btn-ghost" data-act="out" data-id="' + b.id + '"' + off + '><i class="fa-solid fa-arrow-up"></i> Take out</button>' +
@@ -59,51 +60,29 @@
         });
     }
 
-    function markSelected() {
-        $('bkGrid').querySelectorAll('.ac-bank').forEach(function (el) {
-            el.classList.toggle('selected', Number(el.getAttribute('data-id')) === selectedId);
-        });
-    }
+    // ---------- Neeche ki details table ----------
+    function renderTable() {
+        if (!banks.length) {
+            $('bkRows').innerHTML = '<tr class="vd-empty"><td colspan="4"><i class="fa-regular fa-folder-open"></i>No bank accounts yet</td></tr>';
+            return;
+        }
 
-    // ---------- Statement ----------
-    function loadDetail() {
-        if (!selectedId) { $('bkDetail').style.display = 'none'; return Promise.resolve(); }
-
-        return A.api('GET', '/banks/' + selectedId + '/data' + query())
-            .then(function (d) { detail = d; renderDetail(); })
-            .catch(function (e) { A.toast(e.message, 'err'); });
-    }
-
-    function renderDetail() {
-        var a = detail.account;
-        var st = detail.statement;
-
-        $('bkDetail').style.display = '';
-        $('bkDName').textContent = a.name + ' statement';
-        $('bkDSub').textContent = (a.bank_name || '') + (a.last4 ? ' · ••••' + a.last4 : '') + ' · ' + st.rows.length + ' entr' + (st.rows.length === 1 ? 'y' : 'ies');
-
-        A.renderStrip($('bkStrip'), st);
-        $('bkRows').innerHTML = A.statementRows(st);
-    }
-
-    function select(id) {
-        selectedId = id;
-        markSelected();
-        return loadDetail();
+        $('bkRows').innerHTML = banks.map(function (b) {
+            return '<tr>' +
+                '<td>' + (b.created ? A.fmt(b.created) : '—') + '</td>' +
+                '<td><div class="vd-name">' + A.esc(holderOf(b)) + '</div></td>' +
+                '<td>' + A.esc(numberOf(b)) + '</td>' +
+                '<td class="ac-num ac-bal">' + A.money(b.balance) + '</td>' +
+            '</tr>';
+        }).join('');
     }
 
     function loadBanks() {
         return A.api('GET', '/banks/list')
             .then(function (d) {
                 banks = d.banks;
-
-                if (!find(selectedId)) {
-                    var first = banks.filter(function (b) { return b.active; })[0] || banks[0];
-                    selectedId = first ? first.id : null;
-                }
-
                 renderCards(d.total);
-                return loadDetail();
+                renderTable();
             })
             .catch(function (e) { A.toast(e.message, 'err'); });
     }
@@ -111,35 +90,47 @@
     // ---------- Card par click ----------
     $('bkGrid').addEventListener('click', function (e) {
         var btn = e.target.closest('[data-act]');
+        if (!btn) { return; }
 
-        if (btn) {
-            var act = btn.getAttribute('data-act');
-            if (act === 'add') { openForm(null); return; }
+        var act = btn.getAttribute('data-act');
+        if (act === 'add') { openForm(null); return; }
 
-            var b = find(Number(btn.getAttribute('data-id')));
-            if (!b || btn.disabled) { return; }
+        var b = find(Number(btn.getAttribute('data-id')));
+        if (!b || btn.disabled) { return; }
 
-            if (act === 'edit') { openForm(b); }
-            else { A.openEntry({ account: b, direction: act, withMethod: true, onSaved: loadBanks }); }
-            return;
-        }
-
-        var card = e.target.closest('.ac-bank');
-        if (card) { select(Number(card.getAttribute('data-id'))); }
+        if (act === 'edit') { openForm(b); }
+        else { A.openEntry({ account: b, direction: act, withMethod: true, onSaved: loadBanks }); }
     });
 
-    // Entry delete
-    $('bkRows').addEventListener('click', function (e) {
-        var btn = e.target.closest('[data-act="del"]');
-        if (!btn) { return; }
-        A.confirmDelete({ id: btn.getAttribute('data-id'), text: btn.getAttribute('data-text'), onDone: loadBanks });
+    // ---------- Bank name selector ----------
+    var bankPicker = SelectPicker.create({
+        options: BANKS.map(function (n) { return { value: n, label: n, icon: 'fa-solid fa-building-columns' }; }),
+        value: BANKS[0],
+        onChange: toggleOther
+    });
+    $('bfBankBox').appendChild(bankPicker.el);
+
+    function toggleOther() {
+        var other = bankPicker.get() === 'Other';
+        $('bfBankOther').style.display = other ? '' : 'none';
+        if (other) { $('bfBankOther').focus(); }
+    }
+
+    function bankValue() {
+        return bankPicker.get() === 'Other' ? $('bfBankOther').value.trim() : bankPicker.get();
+    }
+
+    // Account number mein sirf digits
+    $('bfNumber').addEventListener('input', function () {
+        this.value = this.value.replace(/\D/g, '');
     });
 
     // ---------- Add / Edit bank ----------
-    var fields = { name: 'bfName', bank_name: 'bfBank', last4: 'bfLast4', opening: 'bfOpening', active: 'bfActive' };
+    var fields = { account_title: 'bfHolder', bank_name: 'bfBank', account_number: 'bfNumber', opening: 'bfOpening' };
 
     function clearErrors() {
-        ['bfName', 'bfBank', 'bfLast4', 'bfOpening', 'bfActive'].forEach(function (id) { A.setErr(id, ''); });
+        ['bfHolder', 'bfBank', 'bfNumber', 'bfOpening'].forEach(function (id) { A.setErr(id, ''); });
+        $('bfBankOther').classList.remove('vd-invalid');
     }
 
     function openForm(b) {
@@ -147,57 +138,59 @@
         clearErrors();
 
         $('bkTitle').textContent = b ? 'Edit Bank Account' : 'Add Bank Account';
-        $('bfName').value = b ? b.name : '';
-        $('bfBank').value = b ? (b.bank_name || '') : '';
-        $('bfTitle').value = b ? (b.account_title || '') : '';
-        $('bfLast4').value = b ? (b.last4 || '') : '';
+        $('bfHolder').value = b ? (b.account_title || '') : '';
+
+        if (b && BANKS.indexOf(b.bank_name) === -1) {
+            bankPicker.set('Other');
+            $('bfBankOther').value = b.bank_name || '';
+        } else {
+            bankPicker.set(b ? b.bank_name : BANKS[0]);
+            $('bfBankOther').value = '';
+        }
+        $('bfBankOther').style.display = bankPicker.get() === 'Other' ? '' : 'none';
+
+        $('bfNumber').value = b ? (b.account_number || '') : '';
         $('bfOpening').value = b ? b.opening : '0';
         $('bfNote').value = b ? b.note : '';
-        $('bfActive').value = b && !b.active ? '0' : '1';
-        $('bfStatusBox').style.display = b ? '' : 'none';
 
         A.openModal('bkModal');
-        setTimeout(function () { $('bfName').focus(); }, 60);
+        setTimeout(function () { $('bfHolder').focus(); }, 60);
     }
 
     $('bkNew').addEventListener('click', function () { openForm(null); });
 
     $('bfSave').addEventListener('click', function () {
-        var name = $('bfName').value.trim();
-        var bank = $('bfBank').value.trim();
-        var last4 = $('bfLast4').value.trim();
+        var holder = $('bfHolder').value.trim();
+        var bank = bankValue();
+        var number = $('bfNumber').value.trim();
         var opening = parseFloat($('bfOpening').value);
         var ok = true;
 
         clearErrors();
 
-        if (name.length < 2) { A.setErr('bfName', 'Enter a name (at least 2 letters)'); ok = false; }
-        if (bank.length < 2) { A.setErr('bfBank', 'Enter the bank name'); ok = false; }
-        if (last4 !== '' && !/^\d{4}$/.test(last4)) { A.setErr('bfLast4', 'Enter exactly 4 digits'); ok = false; }
+        if (holder.length < 2) { A.setErr('bfHolder', 'Enter the account holder name'); ok = false; }
+        if (bank.length < 2) { A.setErr('bfBank', 'Choose or type the bank name'); $('bfBankOther').classList.add('vd-invalid'); ok = false; }
+        if (!/^\d{6,24}$/.test(number)) { A.setErr('bfNumber', 'Enter 6 to 24 digits (numbers only)'); ok = false; }
         if (isNaN(opening) || opening < 0) { A.setErr('bfOpening', 'Enter 0 or more'); ok = false; }
         else if (opening > 100000000000) { A.setErr('bfOpening', 'Amount is too large'); ok = false; }
 
         if (!ok) { return; }
 
         var payload = {
-            name: name,
+            account_title: holder,
             bank_name: bank,
-            account_title: $('bfTitle').value.trim(),
-            last4: last4,
+            account_number: number,
             opening: Math.round(opening * 100) / 100,
             note: $('bfNote').value.trim()
         };
-
-        if (editingId) { payload.active = $('bfActive').value === '1'; }
 
         var btn = $('bfSave');
         btn.disabled = true;
 
         (editingId ? A.api('PUT', '/banks/' + editingId, payload) : A.api('POST', '/banks', payload))
-            .then(function (res) {
+            .then(function () {
                 A.toast(editingId ? 'Bank account updated' : 'Bank account added');
                 A.closeModal('bkModal');
-                if (!editingId && res && res.id) { selectedId = res.id; }
                 loadBanks();
             })
             .catch(function (e) {
@@ -208,18 +201,6 @@
                 if (!shown) { A.toast(e.message, 'err'); }
             })
             .then(function () { btn.disabled = false; });
-    });
-
-    // ---------- Print ----------
-    $('bkPrint').addEventListener('click', function () {
-        if (!detail) { return; }
-        A.printStatement(detail.account, detail.statement, dateFilter ? dateFilter.getRange().label : '');
-    });
-
-    dateFilter = DateFilter.create({
-        mount: $('bkDate'),
-        noun: 'entries',
-        onChange: function () { loadDetail(); }
     });
 
     loadBanks();

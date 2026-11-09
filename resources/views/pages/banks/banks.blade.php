@@ -4,13 +4,13 @@
 
 @push('styles')
 <link rel="stylesheet" href="{{ asset('css/vendors/vendors.css') }}">
-<link rel="stylesheet" href="{{ asset('css/shared/date-filter.css') }}">
 <link rel="stylesheet" href="{{ asset('css/accounts/accounts.css') }}">
+<link rel="stylesheet" href="{{ asset('css/shared/product-ui.css') }}">
 @endpush
 
 @push('scripts')
-<script src="{{ asset('js/shared/date-filter.js') }}"></script>
 <script src="{{ asset('js/accounts/accounts-common.js') }}"></script>
+<script src="{{ asset('js/shared/select-picker.js') }}"></script>
 <script src="{{ asset('js/banks/banks.js') }}"></script>
 @endpush
 
@@ -19,7 +19,7 @@
 <div class="vd-head">
     <div>
         <h1 class="vd-title">Bank Accounts</h1>
-        <p class="vd-sub">Every bank account, its balance and its full statement.</p>
+        <p class="vd-sub">All your bank accounts and their balances.</p>
     </div>
     <button type="button" class="vd-btn-primary" id="bkNew"><i class="fa-solid fa-plus"></i> Add Bank Account</button>
 </div>
@@ -34,31 +34,21 @@
 
 <div class="ac-grid" id="bkGrid"></div>
 
-<div class="vd-panel" id="bkDetail" style="display:none">
+<div class="vd-panel">
     <div class="ac-detail-head">
         <div>
-            <h3 id="bkDName"></h3>
-            <p id="bkDSub"></p>
-        </div>
-        <div class="ac-tools">
-            <div id="bkDate"></div>
-            <button type="button" class="vd-btn-ghost" id="bkPrint"><i class="fa-solid fa-print"></i> Print</button>
+            <h3>Bank Details</h3>
         </div>
     </div>
-
-    <div class="ac-strip" id="bkStrip"></div>
 
     <div class="vd-table-wrap">
         <table class="vd-table ac-table">
             <thead>
                 <tr>
                     <th>Date</th>
-                    <th>Details</th>
-                    <th class="ac-num">In</th>
-                    <th class="ac-num">Out</th>
+                    <th>Account Holder</th>
+                    <th>Account Number</th>
                     <th class="ac-num">Balance</th>
-                    <th>By</th>
-                    <th></th>
                 </tr>
             </thead>
             <tbody id="bkRows"></tbody>
@@ -77,41 +67,28 @@
         <div class="vd-modal-body">
             <div class="vd-grid">
                 <div class="vd-field">
-                    <label>Account name <span class="vd-req">*</span></label>
-                    <input type="text" class="vd-input" id="bfName" maxlength="80" placeholder="e.g. HBL Current">
-                    <small class="vd-err" data-err="bfName"></small>
+                    <label>Account holder name <span class="vd-req">*</span></label>
+                    <input type="text" class="vd-input" id="bfHolder" maxlength="80" placeholder="e.g. Ali Raza">
+                    <small class="vd-err" data-err="bfHolder"></small>
                 </div>
 
                 <div class="vd-field">
                     <label>Bank name <span class="vd-req">*</span></label>
-                    <input type="text" class="vd-input" id="bfBank" maxlength="80" placeholder="e.g. Habib Bank">
+                    <div id="bfBankBox"></div>
+                    <input type="text" class="vd-input" id="bfBankOther" maxlength="80" placeholder="Type the bank name" style="display:none;margin-top:8px">
                     <small class="vd-err" data-err="bfBank"></small>
                 </div>
 
                 <div class="vd-field">
-                    <label>Account title</label>
-                    <input type="text" class="vd-input" id="bfTitle" maxlength="80" placeholder="Optional">
-                </div>
-
-                <div class="vd-field">
-                    <label>Last 4 digits of account no.</label>
-                    <input type="text" class="vd-input" id="bfLast4" maxlength="4" inputmode="numeric" placeholder="1234">
-                    <small class="vd-err" data-err="bfLast4"></small>
+                    <label>Account number <span class="vd-req">*</span></label>
+                    <input type="text" class="vd-input" id="bfNumber" maxlength="24" inputmode="numeric" placeholder="e.g. 01234567890123">
+                    <small class="vd-err" data-err="bfNumber"></small>
                 </div>
 
                 <div class="vd-field">
                     <label>Opening balance (<span class="cur-sym">Rs</span>) <span class="vd-req">*</span></label>
                     <input type="number" class="vd-input" id="bfOpening" min="0" step="any" placeholder="0">
                     <small class="vd-err" data-err="bfOpening"></small>
-                </div>
-
-                <div class="vd-field" id="bfStatusBox">
-                    <label>Status</label>
-                    <select class="vd-input" id="bfActive">
-                        <option value="1">Active</option>
-                        <option value="0">Inactive</option>
-                    </select>
-                    <small class="vd-err" data-err="bfActive"></small>
                 </div>
 
                 <div class="vd-field vd-full">

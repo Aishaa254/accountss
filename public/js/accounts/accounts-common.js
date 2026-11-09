@@ -19,7 +19,7 @@
         return String(t == null ? '' : t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
     }
 
-    var KIND = { deposit: 'Money added', withdraw: 'Money taken out', payment_in: 'Payment received', payment_out: 'Payment made', expense: 'Expense', adjustment: 'Cash count adjustment' };
+    var KIND = { deposit: 'Money added', withdraw: 'Money taken out', payment_in: 'Payment received', payment_out: 'Payment made', expense: 'Expense', adjustment: 'Cash count adjustment', transfer: 'Transfer' };
     // ---------- Laravel se baat karne wala helper ----------
     function api(method, url, body) {
         return fetch(url, {

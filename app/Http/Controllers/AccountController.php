@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\Account;
 use App\Models\AccountTransaction;
+use App\Models\Expense;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
 class AccountController extends Controller
@@ -55,6 +58,8 @@ class AccountController extends Controller
             'bank_name' => $a->bank_name,
             'account_title' => $a->account_title,
             'last4' => $a->last4,
+            'account_number' => $a->account_number,
+            'created' => $a->created_at ? $a->created_at->toDateString() : null,
             'opening' => $a->opening,
             'note' => $a->note ?? '',
             'active' => $a->active,
@@ -71,6 +76,9 @@ class AccountController extends Controller
     {
         $all = $account->transactions()->orderBy('date')->orderBy('id')->get();
         $names = User::whereIn('id', $all->pluck('created_by')->filter()->unique())->pluck('name', 'id');
+
+        $expenseCats = Expense::whereIn('id', $all->where('source_type', 'expense')->pluck('source_id')->filter()->unique())
+            ->pluck('category', 'id');
 
         $running = (float) $account->opening;
         $opening = $running;
@@ -105,9 +113,11 @@ class AccountController extends Controller
                 'method' => $t->method ?? '',
                 'reference' => $t->reference ?? '',
                 'note' => $t->note ?? '',
+                'source' => $t->source_type ?? '',
+                'category' => $t->source_type === 'expense' ? ($expenseCats[$t->source_id] ?? '') : '',
                 'by' => $t->created_by ? ($names[$t->created_by] ?? '') : '',
                 'balance' => $running,
-                'deletable' => in_array($t->kind, ['deposit', 'withdraw'], true),
+                'deletable' => in_array($t->kind, ['deposit', 'withdraw', 'transfer'], true),
             ];
         }
 
@@ -146,7 +156,61 @@ class AccountController extends Controller
     // ---------- Cash ----------
     public function cash(Request $request)
     {
-        return $this->data(Account::cash(), $request);
+        $payload = $this->data(Account::cash(), $request)->getData(true);
+        $payload['rules'] = ['add_only_when_empty' => $this->addOnlyWhenEmpty()];
+
+        return response()->json($payload);
+    }
+
+    // Rule: "Add Money" sirf tab jab cash 0 ho. Cash page ka switch isay on/off karta hai (default: on)
+    // Sirf settings table ke key aur value columns use hote hain, baqi columns se farq nahi parta
+    private function addOnlyWhenEmpty(): bool
+    {
+        try {
+            if (!Schema::hasTable('settings')) {
+                return true;
+            }
+
+            $value = DB::table('settings')->where('key', 'cash_add_only_when_empty')->value('value');
+
+            return ($value ?? '1') === '1';
+        } catch (\Throwable $e) {
+            // Koi bhi masla ho to cash page chalta rahe, rule ON maana jata hai
+            return true;
+        }
+    }
+
+    public function cashRule(Request $request)
+    {
+        $data = $request->validate(['add_only_when_empty' => 'required|boolean']);
+
+        try {
+            // Table na ho to yahin khud ban jati hai, migrate chalane ki zaroorat nahi
+            if (!Schema::hasTable('settings')) {
+                Schema::create('settings', function (\Illuminate\Database\Schema\Blueprint $table) {
+                    $table->id();
+                    $table->string('key')->unique();
+                    $table->text('value')->nullable();
+                    $table->timestamps();
+                });
+            }
+
+            $value = $data['add_only_when_empty'] ? '1' : '0';
+            $exists = DB::table('settings')->where('key', 'cash_add_only_when_empty')->exists();
+
+            if ($exists) {
+                DB::table('settings')->where('key', 'cash_add_only_when_empty')->update(['value' => $value]);
+            } else {
+                DB::table('settings')->insert(['key' => 'cash_add_only_when_empty', 'value' => $value]);
+            }
+        } catch (\Throwable $e) {
+            report($e);
+
+            // Asli wajah screen par dikhao taake pata chale settings table mein kya kam hai
+            return $this->fail('Could not save: ' . $e->getMessage(), 'add_only_when_empty');
+        }
+
+        return response()->json(['add_only_when_empty' => $this->addOnlyWhenEmpty()]);
     }
 
     public function cashOpening(Request $request)
@@ -205,13 +269,112 @@ class AccountController extends Controller
         }
         
     // ---------- Banks ----------
-    private function bankRules(?int $ignoreId = null, bool $update = false): array
+    // ---------- Bank se Cash / Cash se Bank ----------
+    public function transfer(Request $request)
+    {
+        $data = $request->validate([
+            'direction' => 'required|in:to_bank,to_cash',
+            'bank_id' => 'required|integer|exists:accounts,id',
+            'amount' => 'required|numeric|gt:0|max:100000000',
+            'date' => 'required|date|before_or_equal:today',
+            'note' => 'nullable|string|max:150',
+        ], [
+            'bank_id.required' => 'Choose a bank account.',
+            'amount.gt' => 'Amount must be more than 0.',
+            'date.before_or_equal' => 'Date cannot be in the future.',
+        ]);
+
+        $bank = Account::find($data['bank_id']);
+
+        if (!$bank || $bank->type !== 'bank') {
+            return $this->fail('Choose a bank account.', 'bank_id');
+        }
+
+        if (!$bank->active) {
+            return $this->fail('This bank account is inactive.', 'bank_id');
+        }
+
+        $amount = round((float) $data['amount'], 2);
+        $note = trim((string) ($data['note'] ?? ''));
+
+        return DB::transaction(function () use ($data, $bank, $amount, $note) {
+            $cashId = Account::cash()->id;
+
+            // Dono accounts hamesha ek hi tarteeb mein lock hote hain, taake do log aik sath karein to atak na jaye
+            $locked = Account::whereIn('id', [$cashId, $bank->id])
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            $cash = $locked[$cashId];
+            $bankLocked = $locked[$bank->id];
+
+            $from = $data['direction'] === 'to_bank' ? $cash : $bankLocked;
+            $to = $data['direction'] === 'to_bank' ? $bankLocked : $cash;
+
+            if ($amount > $from->balance()) {
+                return $this->fail('Not enough money in ' . $from->name . '. Available: ' . number_format($from->balance(), 2) . '.');
+            }
+
+            $key = (string) Str::uuid();
+
+            $common = [
+                'date' => $data['date'],
+                'amount' => $amount,
+                'kind' => 'transfer',
+                'transfer_key' => $key,
+                'created_by' => auth()->id(),
+            ];
+
+            AccountTransaction::create($common + [
+                'account_id' => $from->id,
+                'direction' => 'out',
+                'note' => Str::limit('To ' . $to->name . ($note !== '' ? ' - ' . $note : ''), 150, ''),
+            ]);
+
+            AccountTransaction::create($common + [
+                'account_id' => $to->id,
+                'direction' => 'in',
+                'note' => Str::limit('From ' . $from->name . ($note !== '' ? ' - ' . $note : ''), 150, ''),
+            ]);
+
+            return response()->json(['ok' => true, 'balance' => $cash->balance()]);
+        });
+    }
+
+    // Transfer galti se ho jaye to dono entries aik sath hat jati hain
+    private function undoTransfer(AccountTransaction $entry)
+    {
+        return DB::transaction(function () use ($entry) {
+            $legs = AccountTransaction::where('transfer_key', $entry->transfer_key)->get();
+
+            $accounts = Account::whereIn('id', $legs->pluck('account_id')->unique())
+                ->orderBy('id')
+                ->lockForUpdate()
+                ->get()
+                ->keyBy('id');
+
+            foreach ($legs as $leg) {
+                $acc = $accounts[$leg->account_id];
+
+                if ($leg->direction === 'in' && $leg->amount > $acc->balance()) {
+                    return $this->fail('This money has already been spent. Undoing the transfer would take ' . $acc->name . ' below 0.', 'entry');
+                }
+            }
+
+            AccountTransaction::where('transfer_key', $entry->transfer_key)->delete();
+
+            return response()->json(['ok' => true]);
+        });
+    }
+
+    private function bankRules(bool $update = false): array
     {
         return [
-            'name' => ['required', 'string', 'min:2', 'max:80', Rule::unique('accounts', 'name')->ignore($ignoreId)],
-            'bank_name' => 'required|string|max:80',
-            'account_title' => 'nullable|string|max:80',
-            'last4' => ['nullable', 'regex:/^\d{4}$/'],
+            'account_title' => 'required|string|min:2|max:80',
+            'bank_name' => 'required|string|min:2|max:80',
+            'account_number' => ['required', 'regex:/^\d{6,24}$/'],
             'opening' => ($update ? 'sometimes|' : '') . 'required|numeric|min:0|max:100000000000',
             'note' => 'nullable|string|max:150',
         ];
@@ -220,13 +383,52 @@ class AccountController extends Controller
     private function bankMessages(): array
     {
         return [
-            'name.required' => 'Enter a name for this account.',
-            'name.unique' => 'An account with this name already exists.',
-            'bank_name.required' => 'Enter the bank name.',
-            'last4.regex' => 'Enter exactly 4 digits.',
+            'account_title.required' => 'Enter the account holder name.',
+            'account_title.min' => 'Enter the full account holder name.',
+            'bank_name.required' => 'Choose the bank.',
+            'account_number.required' => 'Enter the account number.',
+            'account_number.regex' => 'Account number must be 6 to 24 digits (numbers only).',
             'opening.required' => 'Enter the opening balance (0 if none).',
             'opening.min' => 'Opening balance cannot be negative.',
         ];
+    }
+
+    // Same bank + same account number dobara add nahi hoga
+    private function bankExists(string $bank, string $number, ?int $ignoreId = null): bool
+    {
+        return Account::where('type', 'bank')
+            ->where('bank_name', $bank)
+            ->where('account_number', $number)
+            ->when($ignoreId, function ($q) use ($ignoreId) {
+                $q->where('id', '!=', $ignoreId);
+            })
+            ->exists();
+    }
+
+    // "Account name" ab form mein nahi hai. Bank + holder se khud banta hai (cards, popups aur dropdown mein yahi dikhta hai)
+    private function bankLabel(string $bank, string $holder, string $number, ?int $ignoreId = null): string
+    {
+        $taken = function (string $n) use ($ignoreId) {
+            return Account::where('name', $n)
+                ->when($ignoreId, function ($q) use ($ignoreId) {
+                    $q->where('id', '!=', $ignoreId);
+                })
+                ->exists();
+        };
+
+        $base = Str::limit($bank . ' - ' . $holder, 70, '');
+        $name = $base;
+
+        if ($taken($name)) {
+            $name = $base . ' (' . substr($number, -4) . ')';
+        }
+
+        $i = 2;
+        while ($taken($name)) {
+            $name = $base . ' (' . substr($number, -4) . ') ' . $i++;
+        }
+
+        return $name;
     }
 
     public function banks()
@@ -245,7 +447,16 @@ class AccountController extends Controller
     {
         $data = $request->validate($this->bankRules(), $this->bankMessages());
 
-        $account = Account::create($data + ['type' => 'bank', 'created_by' => auth()->id()]);
+        if ($this->bankExists($data['bank_name'], $data['account_number'])) {
+            return $this->fail('This bank account is already added.', 'account_number');
+        }
+
+        $account = Account::create($data + [
+            'name' => $this->bankLabel($data['bank_name'], $data['account_title'], $data['account_number']),
+            'last4' => substr($data['account_number'], -4),
+            'type' => 'bank',
+            'created_by' => auth()->id(),
+        ]);
 
         return response()->json(['id' => $account->id]);
     }
@@ -254,10 +465,11 @@ class AccountController extends Controller
     {
         abort_unless($account->type === 'bank', 404);
 
-        $data = $request->validate(
-            $this->bankRules($account->id, true) + ['active' => 'sometimes|boolean'],
-            $this->bankMessages()
-        );
+        $data = $request->validate($this->bankRules(true), $this->bankMessages());
+
+        if ($this->bankExists($data['bank_name'], $data['account_number'], $account->id)) {
+            return $this->fail('This bank account is already added.', 'account_number');
+        }
 
         if (isset($data['opening'])) {
             $newBalance = round($account->balance() - $account->opening + (float) $data['opening'], 2);
@@ -267,11 +479,10 @@ class AccountController extends Controller
             }
         }
 
-        if (array_key_exists('active', $data) && !$data['active'] && $account->balance() != 0) {
-            return $this->fail('Move the remaining money out of this account before making it inactive.', 'active');
-        }
-
-        $account->update($data);
+        $account->update($data + [
+            'name' => $this->bankLabel($data['bank_name'], $data['account_title'], $data['account_number'], $account->id),
+            'last4' => substr($data['account_number'], -4),
+        ]);
 
         return response()->json(['ok' => true]);
     }
@@ -307,6 +518,10 @@ class AccountController extends Controller
             // Do log aik hi waqt par nikalein to balance galat na ho
             $locked = Account::whereKey($account->id)->lockForUpdate()->first();
 
+            if ($data['direction'] === 'in' && $locked->type === 'cash' && $this->addOnlyWhenEmpty() && $locked->balance() > 0) {
+                return $this->fail('Cash is not empty. Add Money works only when cash is 0. You can change this rule on the Cash page.');
+            }
+
             if ($data['direction'] === 'out' && $amount > $locked->balance()) {
                 return $this->fail('Not enough money in ' . $locked->name . '. Available: ' . number_format($locked->balance(), 2) . '.');
             }
@@ -330,6 +545,10 @@ class AccountController extends Controller
     // Sirf haath se daali hui entry delete hoti hai. Payment wali entry payment se hi badlegi
     public function destroyEntry(AccountTransaction $entry)
     {
+        if ($entry->kind === 'transfer' && $entry->transfer_key) {
+            return $this->undoTransfer($entry);
+        }
+
         if (!in_array($entry->kind, ['deposit', 'withdraw'], true)) {
             return $this->fail('This entry belongs to a payment. Change it from the payment itself.', 'entry');
         }

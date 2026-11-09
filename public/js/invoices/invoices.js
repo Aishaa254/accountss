@@ -172,7 +172,14 @@ function dueTag(inv) {
 }
 
 // ---------- Invoice (bill) html ----------
-function billInner(inv) {
+// Logo: Settings mein jo logo lagaya hai wo har page par APP_BRAND.logo mein aata hai
+function brandLogo() {
+    return (window.APP_BRAND && window.APP_BRAND.logo) ? window.APP_BRAND.logo : '';
+}
+
+// logoSrc na do to wohi logo URL use hota hai (PDF ke liye embedded copy bheji jati hai)
+function billInner(inv, logoSrc) {
+    var logo = logoSrc !== undefined ? logoSrc : brandLogo();
     var t = totals(inv);
     var rows = '';
     inv.items.forEach(function (i) {
@@ -205,7 +212,10 @@ function billInner(inv) {
         : '';
 
     return '<div class="bill-top">' +
-        '<div><div class="bill-co">' + esc(COMPANY.name) + '</div><div class="bill-small">' + esc(COMPANY.address) + '<br>' + esc(COMPANY.phone) + '</div></div>' +
+        '<div class="bill-brand">' +
+            (logo ? '<img class="bill-logo" src="' + esc(logo) + '" alt="">' : '') +
+            '<div><div class="bill-co">' + esc(COMPANY.name) + '</div><div class="bill-small">' + esc(COMPANY.address) + '<br>' + esc(COMPANY.phone) + '</div></div>' +
+        '</div>' +
         '<div class="bill-right"><div class="bill-title">INVOICE</div><div class="bill-small">No: ' + esc(inv.no) + '<br>Date: ' + esc(inv.date) + '<br>Due: ' + esc(inv.due) + '</div></div>' +
         '</div>' +
         '<div class="bill-to"><span>Bill To</span><b>' + esc(inv.customer) + '</b></div>' +
@@ -216,21 +226,43 @@ function billInner(inv) {
 }
 
 // ---------- PDF download ----------
+// PDF banate waqt logo pehle se load hona zaroori hai, is liye uski embedded copy bana kar dete hain
+function logoForPdf() {
+    var url = brandLogo();
+    if (!url) { return Promise.resolve(''); }
+
+    return fetch(url)
+        .then(function (res) { return res.ok ? res.blob() : Promise.reject(); })
+        .then(function (blob) {
+            return new Promise(function (resolve, reject) {
+                var r = new FileReader();
+                r.onload = function () { resolve(r.result); };
+                r.onerror = reject;
+                r.readAsDataURL(blob);
+            });
+        })
+        .catch(function () { return ''; }); // logo na mile to bill bina logo ke banega
+}
+
 function downloadBill(inv) {
     if (!inv) return;
     if (typeof html2pdf === 'undefined') { toast('Internet is required for PDF', 'error'); return; }
-    var box = document.createElement('div');
-    box.className = 'bill';
-    box.style.width = '720px';
-    box.innerHTML = billInner(inv);
-    html2pdf().set({
-        margin: 8,
-        filename: inv.no + '.pdf',
-        image: { type: 'jpeg', quality: 0.98 },
-        html2canvas: { scale: 2 },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(box).save().then(function () {
-        toast(inv.no + ' PDF is downloaded');
+
+    logoForPdf().then(function (logoData) {
+        var box = document.createElement('div');
+        box.className = 'bill';
+        box.style.width = '720px';
+        box.innerHTML = billInner(inv, logoData);
+
+        html2pdf().set({
+            margin: 8,
+            filename: inv.no + '.pdf',
+            image: { type: 'jpeg', quality: 0.98 },
+            html2canvas: { scale: 2, useCORS: true },
+            jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+        }).from(box).save().then(function () {
+            toast(inv.no + ' PDF is downloaded');
+        });
     });
 }
 

@@ -8,7 +8,7 @@ class Account extends Model
 {
     use \App\Models\Concerns\Auditable;
 
-    protected $fillable = ['name', 'type', 'bank_name', 'account_title', 'last4', 'opening', 'active', 'note', 'created_by'];
+    protected $fillable = ['name', 'type', 'bank_name', 'account_title', 'account_number', 'last4', 'opening', 'active', 'note', 'created_by'];
 
     protected $casts = [
         'opening' => 'float',

@@ -114,6 +114,8 @@ Route::middleware('auth')->group(function () {
             Route::get('/cash/data', [AccountController::class, 'cash']);
             Route::put('/cash/opening', [AccountController::class, 'cashOpening']);
             Route::post('/cash/adjust', [AccountController::class, 'cashAdjust']);
+            Route::post('/cash/transfer', [AccountController::class, 'transfer']);
+            Route::put('/cash/rule', [AccountController::class, 'cashRule']);
     
             Route::get('/banks', function () {
                 return view('pages.banks.banks');
